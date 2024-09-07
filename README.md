@@ -11,6 +11,8 @@ Fully control the client document and respond to user events from the backend.
 
 ## Usage
 
+(NPM package not published yet).
+
 Installation:
 ```bash
 npm i websocket-dom
