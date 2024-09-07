@@ -9,8 +9,14 @@ export default defineConfig({
   publicDir: 'public',
   build: {
     outDir: 'dist',
-    emptyOutDir: true,
-    sourcemap: true,
-    minify: false,
+    emptyOutDir: false,
+    sourcemap: 'inline',
+    minify: true,
+    lib: {
+      entry: 'src/client/index.tsx',
+      name: 'client',
+      formats: ['es'],
+      fileName: () => 'client.js',
+    }
   },
 })
