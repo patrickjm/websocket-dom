@@ -77,6 +77,13 @@ The frontend captures all events (clicks, etc) and sends them back to the server
 
 This can only be done under the assumption that the client is only updated from this library (no custom scripts).
 
+## Open problems / todo
+- [ ] Manual flush / reset / sync
+- [ ] Full JSDOM api coverage
+- [ ] Multiple open connections on the same session
+- [ ] Event side effects (Input event -> value change -> cursor move)
+- [ ] Client reconnection
+
 ## Development
 
 Unfortunately, both bun and node are required to fully build this package at the moment.
