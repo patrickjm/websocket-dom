@@ -1,5 +1,7 @@
 # websocket-dom
 
+![NPM Version](https://img.shields.io/npm/v/websocket-dom)
+
 Experimental 2-way sync between backend JSDOM and frontend DOM using WebSockets.
 
 Fully control the client document and respond to user events from the backend.
@@ -10,8 +12,6 @@ Fully control the client document and respond to user events from the backend.
 - Bun/Deno do not work
 
 ## Usage
-
-(NPM package not published yet).
 
 Installation:
 ```bash

@@ -2,6 +2,23 @@
   "name": "websocket-dom",
   "module": "src/index.ts",
   "type": "module",
+  "version": "0.0.1",
+  "description": "Experimental 2-way sync between backend JSDOM and frontend DOM using WebSockets",
+  "repository": "https://github.com/patrickjmcd/websocket-dom",
+  "author": "Patrick Moriarty <patrick@moriarty.dev>",
+  "keywords": [
+    "websocket",
+    "dom",
+    "jsdom",
+    "sync",
+    "realtime"
+  ],
+  "files": [
+    "README.md",
+    "src",
+    "dist",
+    "yarn.lock"
+  ],
   "scripts": {
     "build:client": "vite build",
     "build:server": "bun build src/index.tsx --outdir dist --target node --format esm --sourcemap=inline -e jsdom",
