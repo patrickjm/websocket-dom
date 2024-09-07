@@ -1,0 +1,12 @@
+{
+  // Exclude the dist folder from Quick Open (Cmd+P) but keep it in the file tree
+  "search.exclude": {
+    "dist": true
+  },
+  "files.exclude": {
+    "dist": false
+  },
+  "files.watcherExclude": {
+    "dist/**": true
+  }
+}
