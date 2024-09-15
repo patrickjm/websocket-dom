@@ -1,6 +1,6 @@
 import type { DOMWindow } from "jsdom";
-import type { NodeRef, Nodes } from "./nodes";
-import { Serialized, type DomEmitter } from "./types";
+import type { NodeRef, Nodes } from "../nodes";
+import { Serialized, type DomEmitter } from "../types";
 
 export interface ElementFnArgs {
   window: DOMWindow;
@@ -16,6 +16,7 @@ export function setAttribute(args: ElementFnArgs, name: string, value: string) {
   if (!ref) {
     return;
   }
+  
   emitter.emit('instruction', Serialized.setAttribute(ref, name, value));
 }
 
