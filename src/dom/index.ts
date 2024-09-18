@@ -1,154 +1,109 @@
 import { EventEmitter } from "events";
 import { JSDOM } from "jsdom";
-import type { SerializedEvent } from "../client/types";
 import { dispatchEvent as _dispatchEvent } from "./events";
 import { Nodes } from "./nodes";
 import { Serialized, type DomEmitter } from "./types";
-import * as elementFns from "./wrappers/element";
-import * as documentFns from "./wrappers/document";
 import type { DOMWindow } from "jsdom";
-import { isProxy } from "util/types";
+import type { SerializedEvent } from "../client/types";
 
-interface Wrapped {
-  target: any;
-}
-function isWrapped(target: any): target is Wrapped {
-  return isProxy(target) && !!target?.___wrapped?.target;
-}
+export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEmitter) {
+  const originalElementProto = Object.getPrototypeOf(window.HTMLElement.prototype);
+  const originalDocumentProto = Object.getPrototypeOf(window.Document.prototype);
 
+  // Extend HTMLElement prototype
+  Object.setPrototypeOf(window.HTMLElement.prototype, {
+    ...originalElementProto,
+    setAttribute(name: string, value: string) {
+      const ret = originalElementProto.setAttribute.call(this, name, value);
+      const ref = nodes.findRefFor(this as Node | Element);
+      if (ref) {
+        emitter.emit('instruction', Serialized.setAttribute(ref, name, value));
+      }
+      return ret;
+    },
+    appendChild(child: Element) {
+      const ref = nodes.findRefFor(this as Node | Element);
+      const ret = originalElementProto.appendChild.call(this, child);
+      const childRef = nodes.findRefFor(child as Node | Element);
+      if (childRef && ref) {
+        emitter.emit('instruction', Serialized.appendChild(ref, childRef));
+      }
+      return ret;
+    },
+  });
 
-export function wrap(window: DOMWindow, target: any, nodes: Nodes, emitter: DomEmitter): any {
-  if (!target 
-    || isWrapped(target)
-    || typeof target === 'number'
-    || typeof target === 'boolean'
-    || typeof target === 'string'
-  ) {
-    return target;
-  }
-  // if (typeof target === 'function') {
-  //   return (...args: any[]) => wrap(window, target(...args), nodes, emitter);
-  // }
-  if (target instanceof window.Window
-    || target instanceof window.Document
-    || target instanceof window.HTMLElement) {
-    return new Proxy(target, {
-      getPrototypeOf(target) {
-        return target.constructor;
-      },
-      getOwnPropertyDescriptor(target, prop) {
-        return Object.getOwnPropertyDescriptor(target, prop);
-      },
-      has(target, prop) {
-        return prop in target;
-      },
-      ownKeys(target) {
-        return Object.keys(target);
-      },
-      setPrototypeOf(target, v) {
-        return Object.setPrototypeOf(target, v);
-      },
-      defineProperty(target, property, attributes) {
-        Object.defineProperty(target, property, attributes);
-        return true;
-      },
-      get(target, prop) {
-        if (prop === '___wrapped') {
-          return { target } as Wrapped;
-        }
-        if (prop === 'constructor') {
-          return target.constructor;
-        }
-        if (prop === 'prototype') {
-          return target.constructor.prototype;
-        }
-        if (prop in Object.prototype) {
-          const protoValue = Object.prototype[prop as keyof typeof Object.prototype];
-          if (typeof protoValue === 'function') {
-            return protoValue.bind(target);
-          }
-          return protoValue;
-        }
-        // Custom handlers for HTMLElement
-        if (target instanceof window.HTMLElement && prop in elementFns) {
-          const fn = elementFns[prop as keyof typeof elementFns];
-          const ref = nodes.findRefFor(target);
-          if (!ref) {
-            return fn;
-          }
-          // @ts-ignore
-          return (...args: any[]) => fn({ element: target, nodes, ref, emitter }, ...args);
-        }
+  // Extend Document prototype
+  Object.setPrototypeOf(window.Document.prototype, {
+    ...originalDocumentProto,
+    createElement(tagName: string, options?: ElementCreationOptions) {
+      const element = originalDocumentProto.createElement.call(this, tagName, options);
+      const ref = nodes.stash(element);
+      emitter.emit('instruction', Serialized.createElement(element.tagName, ref.id, options?.is));
+      return element;
+    },
+  });
 
-        // Custom handlers for Document
-        if (target instanceof window.Document && prop in documentFns) {
-          const fn = documentFns[prop as keyof typeof documentFns];
-          const ref = nodes.findRefFor(target);
-          if (!ref) {
-            return fn;
-          }
-          // @ts-ignore
-          return (...args: any[]) => fn({ window, document: target, nodes, ref, emitter }, ...args);
-        }
+  // Extend HTMLElement prototype for property setters
+  const allowedProperties = [
+    // 'value', 'checked', 'disabled', 'readOnly',
+    // 'hidden', 'className', 'id',
+    // 'placeholder', 'title', 'style', 'innerHTML'
+    'accessKey',
+    'className',
+    'contentEditable',
+    'dir',
+    'id',
+    'innerHTML',
+    'innerText',
+    'lang',
+    'nodeValue',
+    // 'outerHTML',
+    // 'outerText',
+    'scrollLeft',
+    'scrollTop',
+    'style',
+    'tabIndex',
+    'textContent',
+    'title',
+    'hidden',
+    'height',
+    'width',
+    'href',
+    'src',
+    'alt',
+    'name',
+    'type',
+    'value',
+    'checked',
+    'selected',
+    'maxLength',
+    'minLength',
+    'max',
+    'min',
+    'step',
+    'multiple',
+    'pattern',
+    'placeholder',
+    'readOnly'
+  ];
 
-        const value = Reflect.get(target, prop);
-        if (typeof value === 'function') {
-          // return wrap(window, value.bind(target), nodes, emitter);
-          return (...args: any[]) => {
-            const ret = value.bind(target)(...args);
-            return wrap(window, ret, nodes, emitter);
-          }
-        }
-        return wrap(window, value, nodes, emitter);
-      },
-      set(target, prop, value) {
-        if (target instanceof window.HTMLElement) {
-          // @ts-ignore
-          target[prop] = value;
-          const ref = nodes.findRefFor(target);
-          if (!ref || typeof prop !== 'string') {
-            return true;
-          }
-          const allowedProperties = [
-            'value', 'checked', 'disabled', 'readOnly',
-            'hidden', 'className', 'id',
-            'placeholder', 'title',
-            'ariaLabel', 'ariaDescribedBy', 'ariaHidden', 'ariaExpanded',
-            'style'
-          ];
-
-          if (allowedProperties.includes(prop)) {
+  allowedProperties.forEach(prop => {
+    const descriptor = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, prop);
+    if (descriptor && descriptor.set) {
+      const originalSetter = descriptor.set;
+      Object.defineProperty(window.HTMLElement.prototype, prop, {
+        ...descriptor,
+        set(this: HTMLElement, value: any) {
+          originalSetter.call(this, value);
+          const ref = nodes.findRefFor(this);
+          if (ref) {
             const serializedValue = typeof value === 'string' ? value : String(value);
             emitter.emit('instruction', Serialized.setProperty(ref, prop, serializedValue));
           }
-          return true;
-        } else {
-          target[prop as keyof typeof target] = value;
-          return true;
         }
-      }
-    });
-  }
-  if (typeof target === 'object') {
-    return new Proxy(target, {
-      get(target, prop) {
-        if (prop === '___wrapped') {
-          return { target } as Wrapped;
-        }
-        return wrap(window, target[prop as keyof typeof target], nodes, emitter);
-      },
-      construct(target, argArray, newTarget) {
-        const ret = new target(...argArray);
-        return wrap(window, ret, nodes, emitter);
-      },
-      set(target, prop, value) {
-        // @ts-ignore
-        target[prop] = value;
-        return true;
-      }
-    });
-  }
-  return target;
+      });
+    }
+  });
 }
 
 export function createDom(doc: string, { url }: { url: string }) {
@@ -164,14 +119,14 @@ export function createDom(doc: string, { url }: { url: string }) {
       runScripts: "outside-only",
       resources: "usable",
       beforeParse(window) {
-        // const originalCreateElement = window.document.createElement;
-        // window.document.createElement = 
         nodes = new Nodes(window);
+        extendPrototypes(window, nodes, emitter);
       },
     }
   );
-  const window = wrap(dom.window, dom.window, nodes!, emitter);
-  const document = window.document;
+
+  const { window } = dom;
+  const { document } = window;
 
   function dispatchEvent(event: SerializedEvent) {
     _dispatchEvent(nodes, emitter, window, event);
@@ -180,6 +135,7 @@ export function createDom(doc: string, { url }: { url: string }) {
   return {
     emitter,
     window,
+    document,
     dispatchEvent
   }
 }
