@@ -44,10 +44,15 @@ export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEm
   });
 
   // Extend HTMLElement prototype for property setters
-  const disallowedProperties: string[] = [];
-  for (const prop in window.HTMLElement.prototype) {
+  const allowedProperties = [
+    'value', 'checked', 'disabled', 'readOnly',
+    'hidden', 'className', 'id',
+    'placeholder', 'title', 'style', 'innerHTML'
+  ];
+
+  allowedProperties.forEach(prop => {
     const descriptor = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, prop);
-    if (descriptor && descriptor.set && !disallowedProperties.includes(prop)) {
+    if (descriptor && descriptor.set) {
       const originalSetter = descriptor.set;
       Object.defineProperty(window.HTMLElement.prototype, prop, {
         ...descriptor,
@@ -61,7 +66,7 @@ export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEm
         }
       });
     }
-  }
+  });
 }
 
 export function createDom(doc: string, { url }: { url: string }) {
