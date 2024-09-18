@@ -44,52 +44,11 @@ export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEm
   });
 
   // Extend HTMLElement prototype for property setters
-  const allowedProperties = [
-    // 'value', 'checked', 'disabled', 'readOnly',
-    // 'hidden', 'className', 'id',
-    // 'placeholder', 'title', 'style', 'innerHTML'
-    'accessKey',
-    'className',
-    'contentEditable',
-    'dir',
-    'id',
-    'innerHTML',
-    'innerText',
-    'lang',
-    'nodeValue',
-    // 'outerHTML',
-    // 'outerText',
-    'scrollLeft',
-    'scrollTop',
-    'style',
-    'tabIndex',
-    'textContent',
-    'title',
-    'hidden',
-    'height',
-    'width',
-    'href',
-    'src',
-    'alt',
-    'name',
-    'type',
-    'value',
-    'checked',
-    'selected',
-    'maxLength',
-    'minLength',
-    'max',
-    'min',
-    'step',
-    'multiple',
-    'pattern',
-    'placeholder',
-    'readOnly'
-  ];
+  const disallowedProperties: string[] = [];
 
-  allowedProperties.forEach(prop => {
+  Object.getOwnPropertyNames(window.HTMLElement.prototype).forEach(prop => {
     const descriptor = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, prop);
-    if (descriptor && descriptor.set) {
+    if (descriptor && descriptor.set && !disallowedProperties.includes(prop)) {
       const originalSetter = descriptor.set;
       Object.defineProperty(window.HTMLElement.prototype, prop, {
         ...descriptor,
