@@ -9,19 +9,32 @@ export type DomEmitterEvents = {
 export type DomEmitter = TypedEmitter<DomEmitterEvents>;
 
 export const enum InstructionType {
-  CreateElement,
+  Create,
   SetAttribute,
   SetProperty,
   AppendChild,
 }
 
 export namespace Serialized {
-  export function createElement(tagName: string, refId: StashedIdNodeRef['id'], is?: string) {
-    const ret = [InstructionType.CreateElement, tagName, refId];
-    if (is) ret.push(is);
-    return ret as [InstructionType.CreateElement, string, StashedIdNodeRef['id'], string?];
+  export function create(type: "element", { tagName, refId, is }: { tagName: string, refId: StashedIdNodeRef['id'], is?: string }): [InstructionType.Create, "element", string, StashedIdNodeRef['id'], string | undefined];
+  export function create(type: "text", data: string): [InstructionType.Create, "text", string];
+  export function create(type: "fragment", refId: StashedIdNodeRef['id']): [InstructionType.Create, "fragment", StashedIdNodeRef['id']];
+  export function create(type: "element"|"text"|"fragment", args: any) {
+    if (type === "element") {
+      const [tagName, refId, is] = args;
+      return [InstructionType.Create, type, tagName, refId, is];
+    } else if (type === "text") {
+      const [data] = args;
+      return [InstructionType.Create, type, data];
+    } else if (type === "fragment") {
+      const [refId] = args;
+      return [InstructionType.Create, type, refId];
+    }
+    throw new Error(`Invalid create type: ${type}`);
   }
-  export type CreateElement = ReturnType<typeof createElement>;
+  export type Create = [InstructionType.Create, "element", string, StashedIdNodeRef['id'], string]
+    | [InstructionType.Create, "text", string]
+    | [InstructionType.Create, "fragment", StashedIdNodeRef['id']];
   export function setAttribute(ref: NodeRef, name: string, value: string) {
     return [InstructionType.SetAttribute, ref, name, value] as [InstructionType.SetAttribute, NodeRef, string, string];
   }
@@ -35,22 +48,36 @@ export namespace Serialized {
   }
   export type AppendChild = ReturnType<typeof appendChild>;
 
-  export type Instruction = CreateElement 
+  export type Instruction = Create 
     | SetAttribute 
     | SetProperty 
-    | AppendChild;
+    | AppendChild
 }
 
 export namespace Deserialized {
-  export function createElement(instruction: Serialized.CreateElement) {
-    return {
-      type: InstructionType.CreateElement as InstructionType.CreateElement,
-      tagName: instruction[1],
-      refId: instruction[2],
-      is: instruction[3],
-    };
+  export function create(instruction: Serialized.Create) {
+    const type = instruction[1];
+    if (type === "element") {
+      return {
+        type: InstructionType.Create,
+        tagName: instruction[2],
+        refId: instruction[3],
+        is: instruction[4],
+      };
+    } else if (type === "text") {
+      return {
+        type: InstructionType.Create,
+        data: instruction[2],
+      };
+    } else if (type === "fragment") {
+      return {
+        type: InstructionType.Create,
+        refId: instruction[2],
+      };
+    }
+    throw new Error(`Invalid create type: ${type}`);
   }
-  export type CreateElement = ReturnType<typeof createElement>;
+  export type Create = ReturnType<typeof create>;
   export function setAttribute(instruction: Serialized.SetAttribute) {
     return {
       type: InstructionType.SetAttribute as InstructionType.SetAttribute,
@@ -80,8 +107,8 @@ export namespace Deserialized {
 
   export function instruction(instruction: Serialized.Instruction) {
     switch (instruction[0]) {
-      case InstructionType.CreateElement:
-        return createElement(instruction);
+      case InstructionType.Create:
+        return create(instruction);
       case InstructionType.SetAttribute:
         return setAttribute(instruction);
       case InstructionType.SetProperty:
@@ -91,7 +118,7 @@ export namespace Deserialized {
     }
   }
 
-  export type Instruction = CreateElement 
+  export type Instruction = Create 
     | SetAttribute 
     | SetProperty 
     | AppendChild;

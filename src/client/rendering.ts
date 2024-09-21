@@ -7,7 +7,7 @@ export function resolveXPath(xpath: string): Element | null {
 
 export function applyInstruction(instruction: Deserialized.Instruction, nodes: Nodes): void {
   switch (instruction.type) {
-    case InstructionType.CreateElement:
+    case InstructionType.Create:
       const createElement = document.createElement(instruction.tagName, { is: instruction.is });
       nodes.stash(createElement, instruction.refId);
       break;

@@ -5,47 +5,57 @@ import { serializeEvent } from "./events";
 import { applyInstruction } from "./rendering";
 import { Deserialized } from "../dom/types";
 
-export const ws = new WebSocket('ws://localhost:3000');
-const nodes = new Nodes(window);
+/**
+ * Creates a client that connects to a websocket-dom server and starts the sync.
+ * @param uri The URI to connect to, e.g. ws://localhost:3000
+ */
+export function createClient(url: string) {
+  const ws = new WebSocket(url);
+  const nodes = new Nodes(window);
 
-ws.onmessage = (event: MessageEvent) => {
-  const data = JSON.parse(event.data) as Message;
-  if (data.type === 'instructions') {
-    for (const instruction of data.instructions) {
-      applyInstruction(Deserialized.instruction(instruction), nodes);
+  ws.onmessage = (event: MessageEvent) => {
+    const data = JSON.parse(event.data) as Message;
+    if (data.type === 'instructions') {
+      for (const instruction of data.instructions) {
+        applyInstruction(Deserialized.instruction(instruction), nodes);
+      }
+    } else if (data.type === 'error') {
+      console.error(data.error, data.errorInfo);
     }
-  } else if (data.type === 'error') {
-    console.error(data.error, data.errorInfo);
+  };
+
+  ws.onopen = () => {
+    console.log('Connection opened');
+  };
+
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error);
+  };
+
+  ws.onclose = () => {
+    console.log('Connection closed');
+  };
+
+  function sendEvent(event: Event): void {
+    const serializedEvent = serializeEvent(event);
+    ws.send(JSON.stringify({
+      type: 'event',
+      event: serializedEvent
+    } as EventMessage));
   }
-};
 
-ws.onopen = () => {
-  console.log('Connection opened');
-};
+  const eventTypes = ['click', 'keydown', 'keyup', 'input', 'change', 'submit', 'focus', 'blur'];
+  eventTypes.forEach(eventType => {
+    document.addEventListener(eventType, sendEvent, true);
+  });
 
-ws.onerror = (error) => {
-  console.error('WebSocket error:', error);
-};
+  const debouncedSendMouseEvent = debounce(sendEvent, 250);
+  const mouseEventTypes = ['mouseenter', 'mouseleave', 'mousemove', 'mouseout', 'mouseover'];
+  mouseEventTypes.forEach(eventType => {
+    document.addEventListener(eventType, debouncedSendMouseEvent, true);
+  });
 
-ws.onclose = () => {
-  console.log('Connection closed');
-};
-
-function sendEvent(event: Event): void {
-  const serializedEvent = serializeEvent(event);
-  ws.send(JSON.stringify({
-    type: 'event',
-    event: serializedEvent
-  } as EventMessage));
+  return {
+    ws
+  }
 }
-
-const eventTypes = ['click', 'keydown', 'keyup', 'input', 'change', 'submit', 'focus', 'blur'];
-eventTypes.forEach(eventType => {
-  document.addEventListener(eventType, sendEvent, true);
-});
-
-const debouncedSendMouseEvent = debounce(sendEvent, 250);
-const mouseEventTypes = ['mouseenter', 'mouseleave', 'mousemove', 'mouseout', 'mouseover'];
-mouseEventTypes.forEach(eventType => {
-  document.addEventListener(eventType, debouncedSendMouseEvent, true);
-});

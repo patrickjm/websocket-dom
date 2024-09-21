@@ -7,12 +7,13 @@ import type { DOMWindow } from "jsdom";
 import type { SerializedEvent } from "../client/types";
 
 export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEmitter) {
-  const originalElementProto = Object.getPrototypeOf(window.HTMLElement.prototype);
-  const originalDocumentProto = Object.getPrototypeOf(window.Document.prototype);
+  const originalElementProto = window.HTMLElement.prototype;
 
-  // Extend HTMLElement prototype
-  Object.setPrototypeOf(window.HTMLElement.prototype, {
-    ...originalElementProto,
+  // Create a new prototype object that inherits from the original
+  const newElementProto = Object.create(originalElementProto);
+
+  // Add custom methods to the new prototype
+  Object.assign(newElementProto, {
     setAttribute(name: string, value: string) {
       const ret = originalElementProto.setAttribute.call(this, name, value);
       const ref = nodes.findRefFor(this as Node | Element);
@@ -31,31 +32,43 @@ export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEm
       return ret;
     },
   });
+  Object.setPrototypeOf(window.HTMLElement, newElementProto);
 
-  // Extend Document prototype
-  Object.setPrototypeOf(window.Document.prototype, {
-    ...originalDocumentProto,
+  const originalDocumentProto = window.Document.prototype;
+  const newDocumentProto = Object.create(originalDocumentProto);
+
+  Object.assign(newDocumentProto, {
     createElement(tagName: string, options?: ElementCreationOptions) {
       const element = originalDocumentProto.createElement.call(this, tagName, options);
       const ref = nodes.stash(element);
-      emitter.emit('instruction', Serialized.createElement(element.tagName, ref.id, options?.is));
+      emitter.emit('instruction', Serialized.create(element.tagName, ref.id, options?.is));
       return element;
     },
+    createTextNode(data: string) {
+      const textNode = originalDocumentProto.createTextNode.call(this, data);
+      const ref = nodes.stash(textNode);
+      emitter.emit('instruction', Serialized.createTextNode(ref.id, data));
+      return textNode;
+    },
+    createDocumentFragment() {
+      const fragment = originalDocumentProto.createDocumentFragment.call(this);
+      const ref = nodes.stash(fragment);
+      emitter.emit('instruction', Serialized.createDocumentFragment(ref.id));
+      return fragment;
+    }
   });
-
-  // Extend HTMLElement prototype for property setters
-  const disallowedProperties: string[] = [];
+  Object.setPrototypeOf(window.Document, newDocumentProto);
 
   Object.getOwnPropertyNames(window.HTMLElement.prototype).forEach(prop => {
     const descriptor = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, prop);
-    if (descriptor && descriptor.set && !disallowedProperties.includes(prop)) {
+    if (descriptor && descriptor.set) {
       const originalSetter = descriptor.set;
       Object.defineProperty(window.HTMLElement.prototype, prop, {
         ...descriptor,
         set(this: HTMLElement, value: any) {
           originalSetter.call(this, value);
           const ref = nodes.findRefFor(this);
-          if (ref) {
+          if (ref && !prop.startsWith('on')) {
             const serializedValue = typeof value === 'string' ? value : String(value);
             emitter.emit('instruction', Serialized.setProperty(ref, prop, serializedValue));
           }

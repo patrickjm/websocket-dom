@@ -34,7 +34,7 @@
       "types": "./dist/index.d.ts"
     },
     "./client": {
-      "import": "./dist/client/index.js",
+      "import": "./dist/client.js",
       "types": "./dist/client/index.d.ts"
     }
   },
