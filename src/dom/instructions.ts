@@ -45,6 +45,7 @@ export namespace CreateElement {
     }
   }
   export function apply({ window, nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('create element', data);
     const element = window.document.createElement(data.tagName, { is: data.is });
     nodes.stash(element, data.refId);
   }
@@ -67,6 +68,7 @@ export namespace CreateTextNode {
     }
   }
   export function apply({ window, nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('create text node', data);
     const text = window.document.createTextNode(data.data);
     nodes.stash(text, data.refId);
   }
@@ -86,6 +88,7 @@ export namespace CreateDocumentFragment {
     }
   }
   export function apply({ window, nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('create document fragment', data);
     const fragment = window.document.createDocumentFragment();
     nodes.stash(fragment, data.refId);
   }
@@ -107,6 +110,7 @@ export namespace RemoveChild {
     }
   }
   export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('remove child', data);
     const parent = nodes.get(data.parentRef);
     const child = nodes.get(data.childRef);
     if (parent && child) {
@@ -131,6 +135,7 @@ export namespace AppendChild {
     }
   }
   export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('append child', data);
     const parent = nodes.get(data.parent);
     const childRef = { type: "stashed-id", id: data.child } as StashedIdNodeRef;
     const child = nodes.get(childRef);
@@ -159,6 +164,7 @@ export namespace SetProperty {
     }
   }
   export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('set property', data);
     const element = nodes.get(data.ref);
     if (element && element instanceof Element) {
       (element as any)[data.name] = data.value;
@@ -184,6 +190,7 @@ export namespace SetAttribute {
     }
   }
   export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('set attribute', data);
     const element = nodes.get(data.ref);
     if (element && element instanceof Element) {
       element.setAttribute(data.name, data.value);

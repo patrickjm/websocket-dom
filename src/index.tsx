@@ -1,7 +1,8 @@
 import { WebSocket } from 'ws';
 import { createDom } from './dom';
-import { type Serialized } from './dom/instructions';
+import { SetAttribute, SetProperty, type Serialized } from './dom/instructions';
 import type { InstructionMessage, Message } from './messages';
+import { getXPath } from 'utils';
 
 export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
   const { emitter, window, dispatchEvent } = createDom(doc, { url });
@@ -24,7 +25,17 @@ export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
     flush();
   });
 
-  
+  // Send initial instructions
+  ws.send(JSON.stringify({
+    type: 'instructions',
+    instructions: [
+      SetProperty.serialize({
+        ref: { type: 'xpath', xpath: getXPath(window.document.body, window)! },
+        name: 'innerHTML',
+        value: window.document.body.innerHTML,
+      })
+    ]
+  }));
 
   // Handle messages from client
   ws.on('message', async (buffer) => {

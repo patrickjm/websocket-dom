@@ -17,7 +17,6 @@ export function createClient(url: string) {
     const data = JSON.parse(event.data) as Message;
     if (data.type === 'instructions') {
       for (const instruction of data.instructions) {
-        // applyInstruction(Deserialized.instruction(instruction), nodes);
         const [type] = instruction;
         switch (type) {
           case InstructionType.CreateElement:
