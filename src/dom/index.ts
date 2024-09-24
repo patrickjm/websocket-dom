@@ -1,12 +1,12 @@
 import { EventEmitter } from "events";
 import { JSDOM } from "jsdom";
 import { dispatchEvent as _dispatchEvent } from "./events";
-import { Nodes } from "./nodes";
-import { Serialized, type DomEmitter } from "./types";
+import { NodeStash } from "./nodes";
+import { AppendChild, CreateElement, SetAttribute, CreateDocumentFragment, CreateTextNode, RemoveChild, SetProperty, type DomEmitter } from "./instructions";
 import type { DOMWindow } from "jsdom";
 import type { SerializedEvent } from "../client/types";
 
-export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEmitter) {
+export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: DomEmitter) {
   const originalElementProto = window.HTMLElement.prototype;
 
   // Create a new prototype object that inherits from the original
@@ -18,16 +18,16 @@ export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEm
       const ret = originalElementProto.setAttribute.call(this, name, value);
       const ref = nodes.findRefFor(this as Node | Element);
       if (ref) {
-        emitter.emit('instruction', Serialized.setAttribute(ref, name, value));
+        emitter.emit('instruction', SetAttribute.serialize({ ref, name, value }));
       }
       return ret;
     },
     appendChild(child: Element) {
-      const ref = nodes.findRefFor(this as Node | Element);
+      const parentRef = nodes.findRefFor(this as Node | Element);
       const ret = originalElementProto.appendChild.call(this, child);
       const childRef = nodes.findRefFor(child as Node | Element);
-      if (childRef && ref) {
-        emitter.emit('instruction', Serialized.appendChild(ref, childRef));
+      if (childRef && childRef.type === 'stashed-id' && parentRef) {
+        emitter.emit('instruction', AppendChild.serialize({ parent: parentRef, child: childRef.id }));
       }
       return ret;
     },
@@ -41,19 +41,19 @@ export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEm
     createElement(tagName: string, options?: ElementCreationOptions) {
       const element = originalDocumentProto.createElement.call(this, tagName, options);
       const ref = nodes.stash(element);
-      emitter.emit('instruction', Serialized.create(element.tagName, ref.id, options?.is));
+      emitter.emit('instruction', CreateElement.serialize({ tagName, refId: ref.id, is: options?.is }));
       return element;
     },
     createTextNode(data: string) {
       const textNode = originalDocumentProto.createTextNode.call(this, data);
       const ref = nodes.stash(textNode);
-      emitter.emit('instruction', Serialized.createTextNode(ref.id, data));
+      emitter.emit('instruction', CreateTextNode.serialize({ refId: ref.id, data }));
       return textNode;
     },
     createDocumentFragment() {
       const fragment = originalDocumentProto.createDocumentFragment.call(this);
       const ref = nodes.stash(fragment);
-      emitter.emit('instruction', Serialized.createDocumentFragment(ref.id));
+      emitter.emit('instruction', CreateDocumentFragment.serialize({ refId: ref.id }));
       return fragment;
     }
   });
@@ -68,9 +68,9 @@ export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEm
         set(this: HTMLElement, value: any) {
           originalSetter.call(this, value);
           const ref = nodes.findRefFor(this);
-          if (ref && !prop.startsWith('on')) {
+          if (ref && !prop.startsWith('on') && typeof value !== 'function') {
             const serializedValue = typeof value === 'string' ? value : String(value);
-            emitter.emit('instruction', Serialized.setProperty(ref, prop, serializedValue));
+            emitter.emit('instruction', SetProperty.serialize({ ref, name: prop, value: serializedValue }));
           }
         }
       });
@@ -79,7 +79,7 @@ export function extendPrototypes(window: DOMWindow, nodes: Nodes, emitter: DomEm
 }
 
 export function createDom(doc: string, { url }: { url: string }) {
-  let nodes: Nodes;
+  let nodes: NodeStash;
   const emitter = new EventEmitter() as DomEmitter;
 
   const dom = new JSDOM(
@@ -91,7 +91,7 @@ export function createDom(doc: string, { url }: { url: string }) {
       runScripts: "outside-only",
       resources: "usable",
       beforeParse(window) {
-        nodes = new Nodes(window);
+        nodes = new NodeStash(window);
         extendPrototypes(window, nodes, emitter);
       },
     }
