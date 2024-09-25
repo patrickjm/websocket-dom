@@ -25,6 +25,12 @@ export enum InstructionType {
   AppendChild = "appendChild",
   SetProperty = "setProperty",
   SetAttribute = "setAttribute",
+  CloneNode = "cloneNode",
+  InsertAdjacentElement = "insertAdjacentElement",
+  InsertAdjacentHTML = "insertAdjacentHTML",
+  InsertAdjacentText = "insertAdjacentText",
+  PrependChild = "prependChild",
+  Normalize = "normalize",
 }
 
 export namespace CreateElement {
@@ -194,6 +200,158 @@ export namespace SetAttribute {
     const element = nodes.get(data.ref);
     if (element && element instanceof Element) {
       element.setAttribute(data.name, data.value);
+    }
+  }
+}
+
+export namespace CloneNode {
+  export type Data = {
+    ref: NodeRef;
+    cloneId: StashedIdNodeRef['id'];
+    deep: boolean;
+  }
+  export type Serialized = [InstructionType.CloneNode, NodeRef, StashedIdNodeRef['id'], boolean]
+  export function serialize(data: Data): Serialized {
+    return [InstructionType.CloneNode, data.ref, data.cloneId, data.deep] as const;
+  }
+  export function deserialize(data: Serialized): Data {
+    return {
+      ref: data[1],
+      cloneId: data[2],
+      deep: data[3],
+    }
+  }
+  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('clone node', data);
+    const node = nodes.get(data.ref);
+    const clonedNode = node!.cloneNode(data.deep);
+    nodes.stash(clonedNode, data.cloneId);
+  }
+}
+
+export namespace InsertAdjacentElement {
+  export type Data = {
+    ref: NodeRef;
+    where: 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend';
+    element: StashedIdNodeRef['id'];
+  }
+  export type Serialized = [InstructionType.InsertAdjacentElement, NodeRef, 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend', StashedIdNodeRef['id']]
+  export function serialize(data: Data): Serialized {
+    return [InstructionType.InsertAdjacentElement, data.ref, data.where, data.element] as const;
+  }
+  export function deserialize(data: Serialized): Data {
+    return {
+      ref: data[1],
+      where: data[2],
+      element: data[3],
+    }
+  }
+  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('insert adjacent element', data);
+    const element = nodes.get(data.ref) as Element;
+    const toInsert = nodes.get({ type: "stashed-id", id: data.element } as StashedIdNodeRef)!;
+    if (element && toInsert) {
+      element.insertAdjacentElement(data.where, toInsert as Element);
+    }
+  }
+}
+
+export namespace InsertAdjacentHTML {
+  export type Data = {
+    ref: NodeRef;
+    where: 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend';
+    html: string;
+  }
+  export type Serialized = [InstructionType.InsertAdjacentHTML, NodeRef, 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend', string]
+  export function serialize(data: Data): Serialized {
+    return [InstructionType.InsertAdjacentHTML, data.ref, data.where, data.html] as const;
+  }
+  export function deserialize(data: Serialized): Data {
+    return {
+      ref: data[1],
+      where: data[2],
+      html: data[3],
+    }
+  }
+  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('insert adjacent HTML', data);
+    const element = nodes.get(data.ref) as Element;
+    if (element) {
+      element.insertAdjacentHTML(data.where, data.html);
+    }
+  }
+}
+
+export namespace InsertAdjacentText {
+  export type Data = {
+    ref: NodeRef;
+    where: 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend';
+    text: string;
+  }
+  export type Serialized = [InstructionType.InsertAdjacentText, NodeRef, 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend', string]
+  export function serialize(data: Data): Serialized {
+    return [InstructionType.InsertAdjacentText, data.ref, data.where, data.text] as const;
+  }
+  export function deserialize(data: Serialized): Data {
+    return {
+      ref: data[1],
+      where: data[2],
+      text: data[3],
+    }
+  }
+  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('insert adjacent text', data);
+    const element = nodes.get(data.ref) as Element;
+    if (element) {
+      element.insertAdjacentText(data.where, data.text);
+    }
+  }
+}
+
+export namespace PrependChild {
+  export type Data = {
+    parent: NodeRef;
+    child: StashedIdNodeRef['id'];
+  }
+  export type Serialized = [InstructionType.PrependChild, NodeRef, StashedIdNodeRef['id']]
+  export function serialize(data: Data): Serialized {
+    return [InstructionType.PrependChild, data.parent, data.child] as const;
+  }
+  export function deserialize(data: Serialized): Data {
+    return {
+      parent: data[1],
+      child: data[2],
+    }
+  }
+  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('prepend child', data);
+    const parent = nodes.get(data.parent) as Element;
+    const child = nodes.get({ type: 'stashed-id', id: data.child });
+    if (parent && child) {
+      parent.prepend(child);
+      nodes.unstash({ type: 'stashed-id', id: data.child });
+    }
+  }
+}
+
+export namespace Normalize {
+  export type Data = {
+    ref: NodeRef;
+  }
+  export type Serialized = [InstructionType.Normalize, NodeRef]
+  export function serialize(data: Data): Serialized {
+    return [InstructionType.Normalize, data.ref] as const;
+  }
+  export function deserialize(data: Serialized): Data {
+    return {
+      ref: data[1],
+    }
+  }
+  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('normalize', data);
+    const node = nodes.get(data.ref);
+    if (node) {
+      node.normalize();
     }
   }
 }

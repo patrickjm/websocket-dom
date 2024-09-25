@@ -2,24 +2,14 @@ import { EventEmitter } from "events";
 import { JSDOM } from "jsdom";
 import { dispatchEvent as _dispatchEvent } from "./events";
 import { NodeStash } from "./nodes";
-import { AppendChild, CreateElement, SetAttribute, CreateDocumentFragment, CreateTextNode, RemoveChild, SetProperty, type DomEmitter } from "./instructions";
+import { AppendChild, CreateElement, SetAttribute, CreateDocumentFragment, CreateTextNode, RemoveChild, SetProperty, type DomEmitter, CloneNode, InsertAdjacentElement, InsertAdjacentHTML, InsertAdjacentText, PrependChild, Normalize } from "./instructions";
 import type { DOMWindow } from "jsdom";
 import type { SerializedEvent } from "../client/types";
 
 export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: DomEmitter) {
-  // Extend HTMLElement prototype
-  const originalSetAttribute = window.HTMLElement.prototype.setAttribute;
-  window.HTMLElement.prototype.setAttribute = function(name: string, value: string) {
-    const ret = originalSetAttribute.call(this, name, value);
-    const ref = nodes.findRefFor(this as Node | Element);
-    if (ref) {
-      emitter.emit('instruction', SetAttribute.serialize({ ref, name, value }));
-    }
-    return ret;
-  };
-
-  const originalAppendChild = window.HTMLElement.prototype.appendChild;
-  window.HTMLElement.prototype.appendChild = function<T extends Node>(child: T): T {
+  
+  const originalAppendChild = window.Node.prototype.appendChild;
+  window.Node.prototype.appendChild = function<T extends Node>(child: T): T {
     const parentRef = nodes.findRefFor(this as Node | Element);
     const ret = originalAppendChild.call(this, child);
     const childRef = nodes.findRefFor(child as Node | Element);
@@ -27,6 +17,93 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
       emitter.emit('instruction', AppendChild.serialize({ parent: parentRef, child: childRef.id }));
     }
     return ret as T;
+  };
+
+  const originalRemoveChild = window.Node.prototype.removeChild;
+  window.Node.prototype.removeChild = function<T extends Node>(child: T): T {
+    const parentRef = nodes.findRefFor(this as Node | Element);
+    const ret = originalRemoveChild.call(this, child);
+    const childRef = nodes.findRefFor(child as Node | Element);
+    if (childRef && childRef.type === 'stashed-id' && parentRef) {
+      emitter.emit('instruction', RemoveChild.serialize({ parentRef, childRef }));
+    }
+    return ret as T;
+  };
+
+
+  const originalCloneNode = window.Node.prototype.cloneNode;
+  window.Node.prototype.cloneNode = function(deep: boolean) {
+    const ret = originalCloneNode.call(this, deep);
+    const ref = nodes.stash(ret);
+    emitter.emit('instruction', CloneNode.serialize({ ref, cloneId: ref.id, deep }));
+    return ret;
+  };
+
+  const originalInsertAdjacentElement = window.Element.prototype.insertAdjacentElement;
+  window.Element.prototype.insertAdjacentElement = function(where: InsertPosition, element: Element): Element | null {
+    const ret = originalInsertAdjacentElement.call(this, where, element);
+    const ref = nodes.findRefFor(this as Node | Element);
+    const elementRef = nodes.stash(element);
+    if (ref) {
+      emitter.emit('instruction', InsertAdjacentElement.serialize({ ref, where, element: elementRef.id }));
+    }
+    return ret;
+  };
+
+  const originalInsertAdjacentHTML = window.Element.prototype.insertAdjacentHTML;
+  window.Element.prototype.insertAdjacentHTML = function(where: InsertPosition, html: string): void {
+    originalInsertAdjacentHTML.call(this, where, html);
+    const ref = nodes.findRefFor(this as Node | Element);
+    if (ref) {
+      emitter.emit('instruction', InsertAdjacentHTML.serialize({ ref, where, html }));
+    }
+  };
+
+  const originalInsertAdjacentText = window.Element.prototype.insertAdjacentText;
+  window.Element.prototype.insertAdjacentText = function(where: InsertPosition, text: string): void {
+    originalInsertAdjacentText.call(this, where, text);
+    const ref = nodes.findRefFor(this as Node | Element);
+    if (ref) {
+      emitter.emit('instruction', InsertAdjacentText.serialize({ ref, where, text }));
+    }
+  };
+
+  const originalNormalize = window.Node.prototype.normalize;
+  window.Node.prototype.normalize = function(): void {
+    originalNormalize.call(this);
+    const ref = nodes.findRefFor(this as Node);
+    if (ref) {
+      emitter.emit('instruction', Normalize.serialize({ ref }));
+    }
+  };
+
+  const originalPrepend = window.Element.prototype.prepend;
+  window.Element.prototype.prepend = function(...args: (Node | string)[]): void {
+    originalPrepend.apply(this, args);
+    const parentRef = nodes.findRefFor(this as Node | Element);
+    if (parentRef) {
+      args.forEach((node) => {
+        if (node instanceof Node) {
+          const childRef = nodes.stash(node);
+          emitter.emit('instruction', PrependChild.serialize({ parent: parentRef, child: childRef.id }));
+        } else if (typeof node === 'string') {
+          // If it's a string, we need to create a text node
+          const textNode = document.createTextNode(node);
+          const childRef = nodes.stash(textNode);
+          emitter.emit('instruction', PrependChild.serialize({ parent: parentRef, child: childRef.id }));
+        }
+      });
+    }
+  };
+
+  const originalSetAttribute = window.Element.prototype.setAttribute;
+  window.Element.prototype.setAttribute = function(name: string, value: string) {
+    const ret = originalSetAttribute.call(this, name, value);
+    const ref = nodes.findRefFor(this as Node | Element);
+    if (ref) {
+      emitter.emit('instruction', SetAttribute.serialize({ ref, name, value }));
+    }
+    return ret;
   };
 
   // Extend Document prototype
@@ -97,6 +174,7 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
 
   extendPrototypeProperties(window.HTMLElement.prototype, nodes, emitter);
   extendPrototypeProperties(window.Element.prototype, nodes, emitter);
+  extendPrototypeProperties(window.Node.prototype, nodes, emitter);
 }
 
 export function createDom(doc: string, { url }: { url: string }) {
