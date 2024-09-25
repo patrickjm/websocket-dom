@@ -3,7 +3,7 @@ import { NodeStash } from "../dom/nodes";
 import { debounce } from "../utils";
 import { serializeEvent } from "./events";
 // import { applyInstruction } from "./rendering";
-import { AppendChild, CreateDocumentFragment, CreateElement, InstructionType, SetAttribute, SetProperty } from "../dom/instructions";
+import * as Instr from "../dom/instructions";
 
 /**
  * Creates a client that connects to a websocket-dom server and starts the sync.
@@ -12,6 +12,7 @@ import { AppendChild, CreateDocumentFragment, CreateElement, InstructionType, Se
 export function createClient(url: string) {
   const ws = new WebSocket(url);
   const nodes = new NodeStash(window);
+  console.log('nodes', nodes);
 
   ws.onmessage = (event: MessageEvent) => {
     const data = JSON.parse(event.data) as Message;
@@ -19,20 +20,44 @@ export function createClient(url: string) {
       for (const instruction of data.instructions) {
         const [type] = instruction;
         switch (type) {
-          case InstructionType.CreateElement:
-            CreateElement.apply({ window, nodes }, CreateElement.deserialize(instruction as CreateElement.Serialized));
+          case Instr.InstructionType.CreateElement:
+            Instr.CreateElement.apply({ window, nodes }, Instr.CreateElement.deserialize(instruction as Instr.CreateElement.Serialized));
             break;
-          case InstructionType.SetAttribute:
-            SetAttribute.apply({ window, nodes }, SetAttribute.deserialize(instruction as SetAttribute.Serialized));
+          case Instr.InstructionType.SetAttribute:
+            Instr.SetAttribute.apply({ window, nodes }, Instr.SetAttribute.deserialize(instruction as Instr.SetAttribute.Serialized));
             break;
-          case InstructionType.SetProperty:
-            SetProperty.apply({ window, nodes }, SetProperty.deserialize(instruction as SetProperty.Serialized));
+          case Instr.InstructionType.SetProperty:
+            Instr.SetProperty.apply({ window, nodes }, Instr.SetProperty.deserialize(instruction as Instr.SetProperty.Serialized));
             break;
-          case InstructionType.AppendChild:
-            AppendChild.apply({ window, nodes }, AppendChild.deserialize(instruction as AppendChild.Serialized));
+          case Instr.InstructionType.AppendChild:
+            Instr.AppendChild.apply({ window, nodes }, Instr.AppendChild.deserialize(instruction as Instr.AppendChild.Serialized));
             break;
-          case InstructionType.CreateDocumentFragment:
-            CreateDocumentFragment.apply({ window, nodes }, CreateDocumentFragment.deserialize(instruction as CreateDocumentFragment.Serialized));
+          case Instr.InstructionType.CreateDocumentFragment:
+            Instr.CreateDocumentFragment.apply({ window, nodes }, Instr.CreateDocumentFragment.deserialize(instruction as Instr.CreateDocumentFragment.Serialized));
+            break;
+          case Instr.InstructionType.CreateTextNode:
+            Instr.CreateTextNode.apply({ window, nodes }, Instr.CreateTextNode.deserialize(instruction as Instr.CreateTextNode.Serialized));
+            break;
+          case Instr.InstructionType.RemoveChild:
+            Instr.RemoveChild.apply({ window, nodes }, Instr.RemoveChild.deserialize(instruction as Instr.RemoveChild.Serialized));
+            break;
+          case Instr.InstructionType.CloneNode:
+            Instr.CloneNode.apply({ window, nodes }, Instr.CloneNode.deserialize(instruction as Instr.CloneNode.Serialized));
+            break;
+          case Instr.InstructionType.InsertAdjacentElement:
+            Instr.InsertAdjacentElement.apply({ window, nodes }, Instr.InsertAdjacentElement.deserialize(instruction as Instr.InsertAdjacentElement.Serialized));
+            break;
+          case Instr.InstructionType.InsertAdjacentHTML:
+            Instr.InsertAdjacentHTML.apply({ window, nodes }, Instr.InsertAdjacentHTML.deserialize(instruction as Instr.InsertAdjacentHTML.Serialized));
+            break;
+          case Instr.InstructionType.InsertAdjacentText:
+            Instr.InsertAdjacentText.apply({ window, nodes }, Instr.InsertAdjacentText.deserialize(instruction as Instr.InsertAdjacentText.Serialized));
+            break;
+          case Instr.InstructionType.PrependChild:
+            Instr.PrependChild.apply({ window, nodes }, Instr.PrependChild.deserialize(instruction as Instr.PrependChild.Serialized));
+            break;
+          case Instr.InstructionType.Normalize:
+            Instr.Normalize.apply({ window, nodes }, Instr.Normalize.deserialize(instruction as Instr.Normalize.Serialized));
             break;
         }
       }

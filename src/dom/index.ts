@@ -117,6 +117,7 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
 
   const originalCreateTextNode = window.Document.prototype.createTextNode;
   window.Document.prototype.createTextNode = function(data: string): Text {
+    console.log('document: create text node', data);
     const textNode = originalCreateTextNode.call(this, data);
     const ref = nodes.stash(textNode);
     emitter.emit('instruction', CreateTextNode.serialize({ refId: ref.id, data }));
@@ -140,6 +141,7 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
         Object.defineProperty(prototype, prop, {
           ...descriptor,
           set(this: Element, value: any) {
+            console.log('element: set property', prop, value);
             originalSetter.call(this, value);
             const ref = nodes.findRefFor(this);
             if (ref && !prop.startsWith('on') && typeof value !== 'function') {
@@ -172,9 +174,13 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
     });
   }
 
-  extendPrototypeProperties(window.HTMLElement.prototype, nodes, emitter);
-  extendPrototypeProperties(window.Element.prototype, nodes, emitter);
   extendPrototypeProperties(window.Node.prototype, nodes, emitter);
+  extendPrototypeProperties(window.Element.prototype, nodes, emitter);
+  extendPrototypeProperties(window.Text.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLInputElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLTextAreaElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLButtonElement.prototype, nodes, emitter);
 }
 
 export function createDom(doc: string, { url }: { url: string }) {
