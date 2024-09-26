@@ -170,9 +170,9 @@ export namespace SetProperty {
     }
   }
   export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('set property', data);
     const element = nodes.get(data.ref);
-    if (element && element instanceof Element) {
+    console.log('set property', data);
+    if (element) {
       (element as any)[data.name] = data.value;
     }
   }
@@ -311,9 +311,9 @@ export namespace InsertAdjacentText {
 export namespace PrependChild {
   export type Data = {
     parent: NodeRef;
-    child: StashedIdNodeRef['id'];
+    child: StashedIdNodeRef['id'] | string;
   }
-  export type Serialized = [InstructionType.PrependChild, NodeRef, StashedIdNodeRef['id']]
+  export type Serialized = [InstructionType.PrependChild, NodeRef, StashedIdNodeRef['id'] | string]
   export function serialize(data: Data): Serialized {
     return [InstructionType.PrependChild, data.parent, data.child] as const;
   }
@@ -326,10 +326,18 @@ export namespace PrependChild {
   export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
     console.log('prepend child', data);
     const parent = nodes.get(data.parent) as Element;
-    const child = nodes.get({ type: 'stashed-id', id: data.child });
+    let child: Node;
+    if (typeof data.child === 'string') {
+      child = document.createTextNode(data.child);
+    } else {
+      const childRef = { type: 'stashed-id', id: data.child } as StashedIdNodeRef;
+      child = nodes.get(childRef) as Node;
+      if (child) {
+        nodes.unstash(childRef);
+      }
+    }
     if (parent && child) {
       parent.prepend(child);
-      nodes.unstash({ type: 'stashed-id', id: data.child });
     }
   }
 }

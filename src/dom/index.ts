@@ -15,6 +15,7 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
     const childRef = nodes.findRefFor(child as Node | Element);
     if (childRef && childRef.type === 'stashed-id' && parentRef) {
       emitter.emit('instruction', AppendChild.serialize({ parent: parentRef, child: childRef.id }));
+      nodes.unstash(childRef);
     }
     return ret as T;
   };
@@ -43,9 +44,10 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
   window.Element.prototype.insertAdjacentElement = function(where: InsertPosition, element: Element): Element | null {
     const ret = originalInsertAdjacentElement.call(this, where, element);
     const ref = nodes.findRefFor(this as Node | Element);
-    const elementRef = nodes.stash(element);
-    if (ref) {
+    const elementRef = nodes.findRefFor(element);
+    if (ref && elementRef && elementRef.type === 'stashed-id') {
       emitter.emit('instruction', InsertAdjacentElement.serialize({ ref, where, element: elementRef.id }));
+      nodes.unstash(elementRef);
     }
     return ret;
   };
@@ -84,13 +86,13 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
     if (parentRef) {
       args.forEach((node) => {
         if (node instanceof Node) {
-          const childRef = nodes.stash(node);
-          emitter.emit('instruction', PrependChild.serialize({ parent: parentRef, child: childRef.id }));
+          const childRef = nodes.findRefFor(node as Node | Element);
+          if (childRef && childRef.type === 'stashed-id') {
+            emitter.emit('instruction', PrependChild.serialize({ parent: parentRef, child: childRef.id }));
+            nodes.unstash(childRef);
+          }
         } else if (typeof node === 'string') {
-          // If it's a string, we need to create a text node
-          const textNode = document.createTextNode(node);
-          const childRef = nodes.stash(textNode);
-          emitter.emit('instruction', PrependChild.serialize({ parent: parentRef, child: childRef.id }));
+          emitter.emit('instruction', PrependChild.serialize({ parent: parentRef, child: node }));
         }
       });
     }
@@ -181,6 +183,10 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
   extendPrototypeProperties(window.HTMLInputElement.prototype, nodes, emitter);
   extendPrototypeProperties(window.HTMLTextAreaElement.prototype, nodes, emitter);
   extendPrototypeProperties(window.HTMLButtonElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLAnchorElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLImageElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLFormElement.prototype, nodes, emitter);
+
 }
 
 export function createDom(doc: string, { url }: { url: string }) {
