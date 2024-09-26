@@ -86,7 +86,7 @@ export function createClient(url: string) {
     } as EventMessage));
   }
 
-  const eventTypes = ['click', 'keydown', 'keyup', 'input', 'change', 'submit', 'focus', 'blur'];
+  const eventTypes = ['click', 'keydown', 'keyup', 'input', 'change', 'submit', 'focus', 'blur', 'focusin', 'focusout'];
   eventTypes.forEach(eventType => {
     document.addEventListener(eventType, sendEvent, true);
   });
