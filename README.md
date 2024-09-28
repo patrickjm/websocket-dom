@@ -6,10 +6,7 @@ Experimental partial 2-way sync between backend JSDOM and frontend DOM using Web
 
 Fully control the client document and respond to user events from the backend.
 
-**Compatibility**:
-- ESM only
-- NodeJS full support
-- Bun/Deno do not work
+**Compatibility**: NodeJS v22+ with ESM supported. Bun/Deno/CJS not supported.
 
 ## Usage
 
@@ -91,3 +88,8 @@ This can only be done under the assumption that the client is only updated from 
 Unfortunately, both bun and node are required to fully build this package at the moment.
 
 But just to develop, only node >= 22 is needed.
+
+## Compatibility
+
+- Why no Bun?
+  - jsdom depends on node-canvas which is not supported by Bun, see: https://github.com/oven-sh/bun/issues/5835
