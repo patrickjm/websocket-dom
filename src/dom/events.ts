@@ -1,10 +1,10 @@
 import type { DOMWindow } from 'jsdom';
 import { type SerializedChangeEvent, type SerializedClickEvent, type SerializedEvent, type SerializedFocusEvent, type SerializedInputEvent, type SerializedKeyboardEvent, type SerializedMouseEvent, type SerializedSubmitEvent } from '../client/types';
 import { type XPath } from "../utils";
-import type { Nodes } from './nodes';
-import type { DomEmitter } from './types';
+import type { NodeStash } from './nodes';
+import type { DomEmitter } from './instructions';
 
-export function dispatchEvent(nodes: Nodes, emitter: DomEmitter, window: DOMWindow, event: SerializedEvent) {
+export function dispatchEvent(nodes: NodeStash, emitter: DomEmitter, window: DOMWindow, event: SerializedEvent) {
   const [targetElement, dispatchedEvent] = deserializeEvent(window, event);
   if (!targetElement || !dispatchedEvent) {
     return;

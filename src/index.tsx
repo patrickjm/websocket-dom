@@ -1,12 +1,13 @@
 import { WebSocket } from 'ws';
 import { createDom } from './dom';
-import { Deserialized, type Serialized } from './dom/types';
+import { SetAttribute, SetProperty, type Serialized } from './dom/instructions';
 import type { InstructionMessage, Message } from './messages';
+import { getXPath } from 'utils';
 
 export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
   const { emitter, window, dispatchEvent } = createDom(doc, { url });
 
-  const batch: { instructions: Serialized.Instruction[] } = { instructions: [] };
+  const batch: { instructions: Serialized[] } = { instructions: [] };
   function flush() {
     if (batch.instructions.length === 0) {
       return;
@@ -16,7 +17,7 @@ export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
     ws.send(JSON.stringify({ type: 'instructions', instructions: instr } as InstructionMessage));
   }
 
-  emitter.on('instruction', (instruction: Serialized.Instruction) => {
+  emitter.on('instruction', (instruction: Serialized) => {
     batch.instructions.push(instruction);
     setTimeout(flush, 0);
   });
@@ -24,7 +25,17 @@ export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
     flush();
   });
 
-  // TODO: Initial full sync
+  // Send initial instructions
+  ws.send(JSON.stringify({
+    type: 'instructions',
+    instructions: [
+      SetProperty.serialize({
+        ref: { type: 'xpath', xpath: getXPath(window.document.body, window)! },
+        name: 'innerHTML',
+        value: window.document.body.innerHTML,
+      })
+    ]
+  }));
 
   // Handle messages from client
   ws.on('message', async (buffer) => {

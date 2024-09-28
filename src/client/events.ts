@@ -22,6 +22,8 @@ export function serializeEvent(event: Event): SerializedEvent {
       return serializeKeyboardEvent(event as KeyboardEvent, baseEvent);
     case 'focus':
     case 'blur':
+    case 'focusin':
+    case 'focusout':
       return baseEvent as SerializedEvent;
     case 'input':
       return serializeInputEvent(event as InputEvent, baseEvent);

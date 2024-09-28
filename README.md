@@ -71,9 +71,9 @@ Assuming you're using Vite, you can do this:
 
 ## How it works
 
-On the backend, JSDOM is wrapped in a Proxy. When DOM mutations are made (creating, removing, or updating nodes), they're serialized and sent to the frontend where they're patched to the browser's DOM. 
+On the backend, JSDOM classes are patched so that before mutations are applied (createElement, appendChild, etc.), they're intercepted, serialized, and sent to the frontend.
 
-The frontend captures all events (clicks, etc) and sends them back to the server where they're dispatched to JSDOM. The cycle repeats.
+The frontend receives the mutations and applies them to the DOM. User events like clicks, keyboard inputs, etc. are sent back over websocket to the backend where they're dispatched to JSDOM.
 
 This can only be done under the assumption that the client is only updated from this library (no custom scripts).
 

@@ -1,9 +1,9 @@
 import type { SerializedEvent } from "./client/types";
-import type { Serialized } from "./dom/types";
+import type { Serialized } from "./dom/instructions";
 
 export interface InstructionMessage {
   type: 'instructions';
-  instructions: Serialized.Instruction[];
+  instructions: readonly Serialized[];
 }
 
 export interface ErrorMessage {

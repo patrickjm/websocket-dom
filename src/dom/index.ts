@@ -1,89 +1,196 @@
 import { EventEmitter } from "events";
 import { JSDOM } from "jsdom";
-import type { SerializedEvent } from "../client/types";
 import { dispatchEvent as _dispatchEvent } from "./events";
-import { Nodes } from "./nodes";
-import { Serialized, type DomEmitter } from "./types";
-import * as elementFns from "./element";
+import { NodeStash } from "./nodes";
+import { AppendChild, CreateElement, SetAttribute, CreateDocumentFragment, CreateTextNode, RemoveChild, SetProperty, type DomEmitter, CloneNode, InsertAdjacentElement, InsertAdjacentHTML, InsertAdjacentText, PrependChild, Normalize } from "./instructions";
 import type { DOMWindow } from "jsdom";
+import type { SerializedEvent } from "../client/types";
 
-export function wrapElement(window: DOMWindow, element: HTMLElement, nodes: Nodes, emitter: DomEmitter) {
-  return new Proxy(element, {
-    getPrototypeOf(target) {
-      return element.constructor;
-    },
-    get(target, prop) {
-      if (prop === '___target') {
-        return target;
-      }
-      if (prop in elementFns) {
-        const fn = elementFns[prop as keyof typeof elementFns];
-        const ref = nodes.findRefFor(target);
-        if (!ref) {
-          return fn;
+export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: DomEmitter) {
+  
+  const originalAppendChild = window.Node.prototype.appendChild;
+  window.Node.prototype.appendChild = function<T extends Node>(child: T): T {
+    const parentRef = nodes.findRefFor(this as Node | Element);
+    const ret = originalAppendChild.call(this, child);
+    const childRef = nodes.findRefFor(child as Node | Element);
+    if (childRef && childRef.type === 'stashed-id' && parentRef) {
+      emitter.emit('instruction', AppendChild.serialize({ parent: parentRef, child: childRef.id }));
+      nodes.unstash(childRef);
+    }
+    return ret as T;
+  };
+
+  const originalRemoveChild = window.Node.prototype.removeChild;
+  window.Node.prototype.removeChild = function<T extends Node>(child: T): T {
+    const parentRef = nodes.findRefFor(this as Node | Element);
+    const ret = originalRemoveChild.call(this, child);
+    const childRef = nodes.findRefFor(child as Node | Element);
+    if (childRef && childRef.type === 'stashed-id' && parentRef) {
+      emitter.emit('instruction', RemoveChild.serialize({ parentRef, childRef }));
+    }
+    return ret as T;
+  };
+
+
+  const originalCloneNode = window.Node.prototype.cloneNode;
+  window.Node.prototype.cloneNode = function(deep: boolean) {
+    const ret = originalCloneNode.call(this, deep);
+    const ref = nodes.stash(ret);
+    emitter.emit('instruction', CloneNode.serialize({ ref, cloneId: ref.id, deep }));
+    return ret;
+  };
+
+  const originalInsertAdjacentElement = window.Element.prototype.insertAdjacentElement;
+  window.Element.prototype.insertAdjacentElement = function(where: InsertPosition, element: Element): Element | null {
+    const ret = originalInsertAdjacentElement.call(this, where, element);
+    const ref = nodes.findRefFor(this as Node | Element);
+    const elementRef = nodes.findRefFor(element);
+    if (ref && elementRef && elementRef.type === 'stashed-id') {
+      emitter.emit('instruction', InsertAdjacentElement.serialize({ ref, where, element: elementRef.id }));
+      nodes.unstash(elementRef);
+    }
+    return ret;
+  };
+
+  const originalInsertAdjacentHTML = window.Element.prototype.insertAdjacentHTML;
+  window.Element.prototype.insertAdjacentHTML = function(where: InsertPosition, html: string): void {
+    originalInsertAdjacentHTML.call(this, where, html);
+    const ref = nodes.findRefFor(this as Node | Element);
+    if (ref) {
+      emitter.emit('instruction', InsertAdjacentHTML.serialize({ ref, where, html }));
+    }
+  };
+
+  const originalInsertAdjacentText = window.Element.prototype.insertAdjacentText;
+  window.Element.prototype.insertAdjacentText = function(where: InsertPosition, text: string): void {
+    originalInsertAdjacentText.call(this, where, text);
+    const ref = nodes.findRefFor(this as Node | Element);
+    if (ref) {
+      emitter.emit('instruction', InsertAdjacentText.serialize({ ref, where, text }));
+    }
+  };
+
+  const originalNormalize = window.Node.prototype.normalize;
+  window.Node.prototype.normalize = function(): void {
+    originalNormalize.call(this);
+    const ref = nodes.findRefFor(this as Node);
+    if (ref) {
+      emitter.emit('instruction', Normalize.serialize({ ref }));
+    }
+  };
+
+  const originalPrepend = window.Element.prototype.prepend;
+  window.Element.prototype.prepend = function(...args: (Node | string)[]): void {
+    originalPrepend.apply(this, args);
+    const parentRef = nodes.findRefFor(this as Node | Element);
+    if (parentRef) {
+      args.forEach((node) => {
+        if (node instanceof Node) {
+          const childRef = nodes.findRefFor(node as Node | Element);
+          if (childRef && childRef.type === 'stashed-id') {
+            emitter.emit('instruction', PrependChild.serialize({ parent: parentRef, child: childRef.id }));
+            nodes.unstash(childRef);
+          }
+        } else if (typeof node === 'string') {
+          emitter.emit('instruction', PrependChild.serialize({ parent: parentRef, child: node }));
         }
-        // @ts-ignore
-        return (...args: any[]) => fn({ element: target, nodes, ref, emitter }, ...args);
-      }
-      const value = Reflect.get(target, prop);
-      if (value instanceof window.HTMLElement) {
-        return wrapElement(window, value, nodes, emitter);
-      }
-      return value;
-    },
-    set(target, prop, value) {
-      // @ts-ignore
-      target[prop] = value;
-      const ref = nodes.findRefFor(target);
-      if (!ref || typeof prop !== 'string') {
-        return true;
-      } 
-      emitter.emit('instruction', Serialized.setProperty(ref, prop, value));
-      return true;
+      });
     }
-  });
-}
+  };
 
-function wrapDocument(window: DOMWindow, document: Document, nodes: Nodes, emitter: DomEmitter) {
-  return new Proxy(document, {
-    getPrototypeOf(target) {
-      return target.constructor;
-    },
-
-    get(target, prop) {
-      const value = target[prop as keyof Document];
-      if (prop === 'createElement') {
-        return (...args: Parameters<typeof document.createElement>) => {
-          const element = (value as Function).bind(window.document)(...args);
-          const ref = nodes.stash(element);
-          emitter.emit('instruction', Serialized.createElement(element.tagName, ref.id, args[1]?.is));
-          return wrapElement(window, element, nodes, emitter);
-        }
-      } else if (value instanceof window.HTMLElement) {
-        return wrapElement(window, value, nodes, emitter);
-      }
-      return value;
+  const originalSetAttribute = window.Element.prototype.setAttribute;
+  window.Element.prototype.setAttribute = function(name: string, value: string) {
+    const ret = originalSetAttribute.call(this, name, value);
+    const ref = nodes.findRefFor(this as Node | Element);
+    if (ref) {
+      emitter.emit('instruction', SetAttribute.serialize({ ref, name, value }));
     }
-  });
-}
+    return ret;
+  };
 
-function wrapWindow(window: DOMWindow, nodes: Nodes, emitter: DomEmitter) {
-  return new Proxy(window, {
-    getPrototypeOf(target) {
-      return target.constructor;
-    },
-    get(target, prop) {
-      if (prop === 'document') {
-        return wrapDocument(target, target.document, nodes, emitter);
+  // Extend Document prototype
+  const originalCreateElement = window.Document.prototype.createElement;
+  window.Document.prototype.createElement = function(tagName: string, options?: ElementCreationOptions): HTMLElement {
+    const element = originalCreateElement.call(this, tagName, options);
+    const ref = nodes.stash(element);
+    emitter.emit('instruction', CreateElement.serialize({ tagName, refId: ref.id, is: options?.is }));
+    return element;
+  };
+
+  const originalCreateTextNode = window.Document.prototype.createTextNode;
+  window.Document.prototype.createTextNode = function(data: string): Text {
+    console.log('document: create text node', data);
+    const textNode = originalCreateTextNode.call(this, data);
+    const ref = nodes.stash(textNode);
+    emitter.emit('instruction', CreateTextNode.serialize({ refId: ref.id, data }));
+    return textNode;
+  };
+
+  const originalCreateDocumentFragment = window.Document.prototype.createDocumentFragment;
+  window.Document.prototype.createDocumentFragment = function(): DocumentFragment {
+    const fragment = originalCreateDocumentFragment.call(this);
+    const ref = nodes.stash(fragment);
+    emitter.emit('instruction', CreateDocumentFragment.serialize({ refId: ref.id }));
+    return fragment;
+  };
+
+  // Override normal properties
+  function extendPrototypeProperties(prototype: any, nodes: NodeStash, emitter: DomEmitter) {
+    Object.getOwnPropertyNames(prototype).forEach(prop => {
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, prop);
+      if (descriptor && descriptor.set) {
+        const originalSetter = descriptor.set;
+        Object.defineProperty(prototype, prop, {
+          ...descriptor,
+          set(this: Element, value: any) {
+            console.log('element: set property', prop, value);
+            originalSetter.call(this, value);
+            const ref = nodes.findRefFor(this);
+            if (ref && !prop.startsWith('on') && typeof value !== 'function') {
+              const serializedValue = typeof value === 'string' ? value : String(value);
+              emitter.emit('instruction', SetProperty.serialize({ ref, name: prop, value: serializedValue }));
+            }
+          }
+        });
+      } else if (descriptor && descriptor.writable) {
+        // Add handling for regular writable properties
+        const originalValue = descriptor.value;
+        const prefix = '___';
+        Object.defineProperty(prototype, prop, {
+          get() {
+            return this[prefix + prop] || originalValue;
+          },
+          set(value: any) {
+            console.log('element: set property', prop, value);
+            this[prefix + prop] = value;
+            const ref = nodes.findRefFor(this);
+            if (ref && !prop.startsWith('on') && typeof value !== 'function') {
+              const serializedValue = typeof value === 'string' ? value : String(value);
+              emitter.emit('instruction', SetProperty.serialize({ ref, name: prop, value: serializedValue }));
+            }
+          },
+          configurable: true,
+          enumerable: true
+        });
       }
-      // @ts-ignore
-      return target[prop];
-    }
-  });
+    });
+  }
+
+  extendPrototypeProperties(window.Node.prototype, nodes, emitter);
+  extendPrototypeProperties(window.Element.prototype, nodes, emitter);
+  extendPrototypeProperties(window.Text.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLInputElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLTextAreaElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLButtonElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLAnchorElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLImageElement.prototype, nodes, emitter);
+  extendPrototypeProperties(window.HTMLFormElement.prototype, nodes, emitter);
+
 }
 
 export function createDom(doc: string, { url }: { url: string }) {
-  let nodes: Nodes;
+  let nodes: NodeStash;
   const emitter = new EventEmitter() as DomEmitter;
 
   const dom = new JSDOM(
@@ -95,14 +202,14 @@ export function createDom(doc: string, { url }: { url: string }) {
       runScripts: "outside-only",
       resources: "usable",
       beforeParse(window) {
-        // const originalCreateElement = window.document.createElement;
-        // window.document.createElement = 
-        nodes = new Nodes(window);
+        nodes = new NodeStash(window);
+        extendPrototypes(window, nodes, emitter);
       },
     }
   );
-  const window = wrapWindow(dom.window, nodes!, emitter);
-  const document = window.document;
+
+  const { window } = dom;
+  const { document } = window;
 
   function dispatchEvent(event: SerializedEvent) {
     _dispatchEvent(nodes, emitter, window, event);
@@ -111,6 +218,7 @@ export function createDom(doc: string, { url }: { url: string }) {
   return {
     emitter,
     window,
+    document,
     dispatchEvent
   }
 }
