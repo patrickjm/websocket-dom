@@ -2,7 +2,7 @@
 
 ![NPM Version](https://img.shields.io/npm/v/websocket-dom)
 
-Experimental 2-way sync between backend JSDOM and frontend DOM using WebSockets.
+Experimental partial 2-way sync between backend JSDOM and frontend DOM using WebSockets.
 
 Fully control the client document and respond to user events from the backend.
 
@@ -83,6 +83,8 @@ This can only be done under the assumption that the client is only updated from 
 - [ ] Multiple open connections on the same session
 - [ ] Event side effects (Input event -> value change -> cursor move)
 - [ ] Client reconnection
+- [ ] Experiment with client-sided dom mutation intercept
+- [ ] Embedding other jsdom documents as elements
 
 ## Development
 
