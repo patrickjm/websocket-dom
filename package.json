@@ -2,7 +2,7 @@
   "name": "websocket-dom",
   "module": "src/index.ts",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Experimental 2-way sync between backend JSDOM and frontend DOM using WebSockets",
   "repository": "https://github.com/patrickjm/websocket-dom",
   "author": "Patrick Moriarty <patrick@moriarty.dev>",
