@@ -6,7 +6,7 @@ Experimental partial 2-way sync between backend JSDOM and frontend DOM using Web
 
 Fully control the client document and respond to user events from the backend.
 
-**Compatibility**: NodeJS v22+ with ESM **and** the `--experimental-vm-modules` node flag.
+**Compatibility**: NodeJS v22+ with ESM.
 
 ## Usage
 
@@ -15,6 +15,21 @@ Installation:
 npm i websocket-dom
 # or
 yarn add websocket-dom
+```
+
+First, create your app code. This will run in a web-worker in the backend, but it feels just like client-side Javascript. 
+
+In your build step, you need to make sure the worker.js file is compiled to the `dist` folder separately as its own entrypoint.
+
+Create `worker.ts`:
+
+```ts
+const btn = document.createElement('button');
+btn.innerText = 'Click me';
+btn.addEventListener('click', () => {
+  console.log('hello'); // <-- This will be printed in the server terminal
+});
+document.body.appendChild(btn);
 ```
 
 Then set up the server (assuming you're using Express):
@@ -29,19 +44,21 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
 // create a new websocket-dom for each connection
 wss.on('connection', (ws) => {
   // pass the websocket and the initial document
   const doc = '<!DOCTYPE html><html><body></body></html>';
-  const { window } = createWebsocketDom(ws, doc, { url: 'http://localhost:3000' });
+  const { domImport, terminate } = createWebsocketDom(ws, doc, { url: 'http://localhost:3000' });
 
-  const document = window.document;
-  const btn = document.createElement('button');
-  btn.innerText = 'Click me';
-  btn.addEventListener('click', () => {
-    console.log('hello'); // <-- This will be printed in the server terminal
+  ws.on('close', () => {
+    terminate();
   });
-  document.body.appendChild(btn);
+
+  // This must be a relative path to the compiled worker.js file in the dist folder,
+  // NOT the typescript file.
+  domImport(path.join(__dirname.replace('src', 'dist'), 'worker.js'));
 });
 
 server.listen(3000, () => {
@@ -49,22 +66,13 @@ server.listen(3000, () => {
 });
 ```
 
-To set up the browser client, you just need to import `websocket-dom/client`.
+Next we need to set up the client code that actually runs in the browser. This will require a bundler. It will automatically create a websocket connection, watch for client-side events, and update the DOM from backend mutations:
 
-Since this is experimental, only port 3000 is supported until more config options are added.
+```ts
+import { createClient } from "websocket-dom/client";
 
-Assuming you're using Vite, you can do this:
-
-```html
-<!DOCTYPE html>
-<html>
-<body>
-  <script type="module" src="websocket-dom/client"></script>
-</body>
-
-</html>
+export const { ws } = createClient('ws://localhost:3000');
 ```
-
 
 ## How it works
 
@@ -75,7 +83,6 @@ The frontend receives the mutations and applies them to the DOM. User events lik
 This can only be done under the assumption that the client is only updated from this library (no custom scripts).
 
 ## Open problems / todo
-- [ ] Window isolation
 - [ ] Manual flush / reset / sync
 - [ ] Full JSDOM api coverage
 - [ ] Multiple open connections on the same session
