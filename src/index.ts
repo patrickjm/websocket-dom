@@ -1,8 +1,24 @@
-import { getXPath } from 'shared-utils';
+import EventEmitter from 'events';
+import type TypedEmitter from 'typed-emitter';
 import { WebSocket } from 'ws';
+import type { SerializedEvent } from './client/types';
 import { createDom } from './dom';
-import { SetProperty, type Serialized } from './dom/instructions';
+import { type Serialized } from './dom/instructions';
 import type { InstructionMessage, Message } from './ws-messages';
+
+export type {
+  BaseSerializedEvent, SerializedChangeEvent,
+  SerializedClickEvent, SerializedEvent, SerializedFocusEvent,
+  SerializedInputEvent,
+  SerializedKeyboardEvent,
+  SerializedMouseEvent,
+  SerializedSubmitEvent
+} from './client/types';
+export { getXPath } from './shared-utils';
+
+export type WebsocketDomEvents = {
+  clientEvent: (event: SerializedEvent) => void;
+}
 
 export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
   const {
@@ -10,8 +26,10 @@ export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
     dispatchEvent,
     terminate,
     domImport,
-    evalString
+    evalString,
+    worker
   } = createDom(doc, { url });
+  const publicEmitter = new EventEmitter() as TypedEmitter<WebsocketDomEvents>;
 
   const batch: { instructions: Serialized[] } = { instructions: [] };
   function flush() {
@@ -33,6 +51,7 @@ export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
     const message = JSON.parse(buffer.toString()) as Message;
     if (message.type === 'event') {
       dispatchEvent(message.event);
+      publicEmitter.emit('clientEvent', message.event);
     }
   });
 
@@ -40,6 +59,8 @@ export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
     terminate,
     dispatchEvent,
     domImport,
-    evalString
+    evalString,
+    emitter: publicEmitter,
+    worker
   };
 }

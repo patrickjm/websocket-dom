@@ -38,6 +38,9 @@ function initDom(doc: string, url: string) {
   globalThisAny.Element = dom.window.Element;
   globalThisAny.Event = dom.window.Event;
   globalThisAny.EventTarget = dom.window.EventTarget;
+  globalThisAny.XMLSerializer = dom.window.XMLSerializer;
+  globalThisAny.XPathResult = dom.window.XPathResult;
+  globalThisAny.XPathEvaluator = dom.window.XPathEvaluator;
   globalThisAny.localStorage = createBrowserStorage();
   globalThisAny.sessionStorage = createBrowserStorage();
 
@@ -67,8 +70,10 @@ addEventListener("message", (event: MessageEvent<MessageToWorker>) => {
     dispatchEvent(nodes, emitter, dom.window, event.data.event);
   } else if (event.data.type === "dom-import") {
     const { url } = event.data;
-    console.log('importing', url);
-    import(url);
+    import(url)
+      .catch((err) => {
+        console.error(`Error importing ${url}: ${err}`);
+      });
   } else if (event.data.type === "eval-string") {
     const { code, id } = event.data;
     const result = eval(code);

@@ -51,6 +51,7 @@ export function createDom(doc: string, { url }: { url: string }) {
     dispatchEvent,
     domImport,
     terminate,
-    evalString
+    evalString,
+    worker
   }
 }
