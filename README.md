@@ -76,15 +76,15 @@ export const { ws } = createClient('ws://localhost:3000');
 
 ## How it works
 
-On the backend, JSDOM classes are patched so that before mutations are applied (createElement, appendChild, etc.), they're intercepted, serialized, and sent to the frontend.
+On the backend, we create an isolated node worker that runs JSDOM. JSDOM classes are patched so that before mutations are applied (createElement, appendChild, etc.), they're intercepted, serialized, and sent to the frontend.
 
 The frontend receives the mutations and applies them to the DOM. User events like clicks, keyboard inputs, etc. are sent back over websocket to the backend where they're dispatched to JSDOM.
 
-This can only be done under the assumption that the client is only updated from this library (no custom scripts).
+To keep the two sides in sync, it's strongly recommended that the only client-side code you load is from this library.
 
 ## Open problems / todo
 - [ ] Manual flush / reset / sync
-- [ ] Full JSDOM api coverage
+- [ ] Comprehensive JSDOM api coverage
 - [ ] Multiple open connections on the same session
 - [ ] Event side effects (Input event -> value change -> cursor move)
 - [ ] Client reconnection
