@@ -10,6 +10,7 @@ import { dispatchEvent as _dispatchEvent } from "./events";
 import { type DomEmitter } from "./instructions";
 import { NodeStash } from "./nodes";
 import { extendPrototypes } from "./prototypes";
+import { createBrowserStorage } from "./utils";
 
 export function createDom(doc: string, { url }: { url: string }) {
   let nodes: NodeStash;
@@ -33,26 +34,8 @@ export function createDom(doc: string, { url }: { url: string }) {
   const window = dom.window;
   const document = window.document;
 
-  const createStorage = () => {
-    let storage: Record<string, string> = {};
-    return {
-      getItem(key: string) {
-        return storage[key];
-      },
-      setItem(key: string, value: string) {
-          storage[key] = String(value);
-      },
-      removeItem(key: string) {
-        delete storage[key];
-      },
-      clear() {
-        storage = {};
-      }
-    };
-  }
-
-  const localStorage = createStorage();
-  const sessionStorage = createStorage();
+  const localStorage = createBrowserStorage();
+  const sessionStorage = createBrowserStorage();
 
   const context = vm.createContext({
     window,

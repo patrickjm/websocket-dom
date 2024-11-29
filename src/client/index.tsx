@@ -1,6 +1,6 @@
 import type { EventMessage, Message } from "../messages";
 import { NodeStash } from "../dom/nodes";
-import { debounce } from "../utils";
+import { debounce } from "../shared-utils";
 import { serializeEvent } from "./events";
 // import { applyInstruction } from "./rendering";
 import * as Instr from "../dom/instructions";

@@ -6,7 +6,7 @@ Experimental partial 2-way sync between backend JSDOM and frontend DOM using Web
 
 Fully control the client document and respond to user events from the backend.
 
-**Compatibility**: NodeJS v22+ with ESM supported. Bun/Deno/CJS not supported.
+**Compatibility**: NodeJS v22+ with ESM **and** the `--experimental-vm-modules` node flag.
 
 ## Usage
 
@@ -75,6 +75,7 @@ The frontend receives the mutations and applies them to the DOM. User events lik
 This can only be done under the assumption that the client is only updated from this library (no custom scripts).
 
 ## Open problems / todo
+- [ ] Window isolation
 - [ ] Manual flush / reset / sync
 - [ ] Full JSDOM api coverage
 - [ ] Multiple open connections on the same session
@@ -82,6 +83,7 @@ This can only be done under the assumption that the client is only updated from 
 - [ ] Client reconnection
 - [ ] Experiment with client-sided dom mutation intercept
 - [ ] Embedding other jsdom documents as elements
+- [ ] Accessing element positions and sizes from the backend
 
 ## Development
 

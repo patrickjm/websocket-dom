@@ -2,10 +2,10 @@ import { WebSocket } from 'ws';
 import { createDom } from './dom';
 import { SetAttribute, SetProperty, type Serialized } from './dom/instructions';
 import type { InstructionMessage, Message } from './messages';
-import { getXPath } from 'utils';
+import { getXPath } from 'shared-utils';
 
 export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
-  const { emitter, window, dispatchEvent } = createDom(doc, { url });
+  const { emitter, window, dispatchEvent, context, execute } = createDom(doc, { url });
 
   const batch: { instructions: Serialized[] } = { instructions: [] };
   function flush() {
@@ -45,5 +45,9 @@ export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
     }
   });
 
-  return window;
+  return {
+    window,
+    execute,
+    context,
+  };
 }
