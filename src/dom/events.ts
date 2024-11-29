@@ -1,6 +1,6 @@
 import type { DOMWindow } from 'jsdom';
 import { type SerializedChangeEvent, type SerializedClickEvent, type SerializedEvent, type SerializedFocusEvent, type SerializedInputEvent, type SerializedKeyboardEvent, type SerializedMouseEvent, type SerializedSubmitEvent } from '../client/types';
-import { type XPath } from "../utils";
+import { type XPath } from "../shared-utils";
 import type { NodeStash } from './nodes';
 import type { DomEmitter } from './instructions';
 

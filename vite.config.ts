@@ -12,11 +12,16 @@ export default defineConfig({
     emptyOutDir: false,
     sourcemap: 'inline',
     minify: true,
+    rollupOptions: {
+      external: ['events', 'jsdom'],
+    },
     lib: {
-      entry: 'src/client/index.tsx',
-      name: 'client',
+      entry: {
+        client: 'src/client/index.tsx',
+        worker: 'src/dom/worker.ts'
+      },
       formats: ['es'],
-      fileName: () => 'client.js',
+      fileName: (format, entryName) => `${entryName}.js`,
     }
   },
 })

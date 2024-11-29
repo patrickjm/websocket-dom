@@ -1,5 +1,5 @@
 import { getElementFromXPath } from "./events";
-import { getXPath, type WindowLike } from "../utils";
+import { getXPath, type WindowLike } from "../shared-utils";
 
 /** Reference to a node by XPath. */
 export interface XPathNodeRef {

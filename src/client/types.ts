@@ -1,4 +1,4 @@
-import type { XPath } from "../utils";
+import type { XPath } from "../shared-utils";
 
 export interface BaseSerializedEvent {
   type: string;

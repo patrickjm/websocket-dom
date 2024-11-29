@@ -1,5 +1,5 @@
 import type { BaseSerializedEvent, SerializedEvent } from "./types";
-import { getXPath } from "../utils";
+import { getXPath } from "../shared-utils";
 
 export function serializeEvent(event: Event): SerializedEvent {
   if (!event.type.startsWith('key')) {
