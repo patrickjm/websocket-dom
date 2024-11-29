@@ -1,138 +1,56 @@
 import { EventEmitter } from "events";
-import { readFile } from "fs/promises";
-import { JSDOM } from "jsdom";
-import { builtinModules, createRequire } from "module";
-import path from "path";
-import { fileURLToPath, pathToFileURL } from "url";
-import vm, { Module, SourceTextModule, SyntheticModule } from "vm";
+import Worker from "web-worker";
 import type { SerializedEvent } from "../client/types";
-import { dispatchEvent as _dispatchEvent } from "./events";
 import { type DomEmitter } from "./instructions";
-import { NodeStash } from "./nodes";
-import { extendPrototypes } from "./prototypes";
-import { createBrowserStorage } from "./utils";
+import { type MessageFromWorker, type MessageToWorker } from "./utils";
+import { randomUUID } from "crypto";
 
 export function createDom(doc: string, { url }: { url: string }) {
-  let nodes: NodeStash;
   const emitter = new EventEmitter() as DomEmitter;
+  const worker = new Worker(new URL("./worker.js", import.meta.url).toString());
 
-  const dom = new JSDOM(
-    doc,
-    {
-      url,
-      pretendToBeVisual: true,
-      contentType: 'text/html',
-      runScripts: "outside-only",
-      resources: "usable",
-      beforeParse(window) {
-        nodes = new NodeStash(window);
-        extendPrototypes(window, nodes, emitter);
-      },
-    }
-  );
-
-  const window = dom.window;
-  const document = window.document;
-
-  const localStorage = createBrowserStorage();
-  const sessionStorage = createBrowserStorage();
-
-  const context = vm.createContext({
-    window,
-    document,
-    console,
-    localStorage,
-    sessionStorage,
-  });
+  worker.postMessage({ type: "init-dom", doc, url } as MessageToWorker);
 
   function dispatchEvent(event: SerializedEvent) {
-    _dispatchEvent(nodes, emitter, window, event);
+    worker.postMessage({ type: "client-event", event } as MessageToWorker);
   }
 
-  async function execute(code: string, currentPath: string): Promise<void> {
-    // Use 'file://' URL for module identifiers when possible
-    const moduleIdentifier = path.isAbsolute(currentPath)
-      ? pathToFileURL(currentPath).href
-      : currentPath;
-  
-    const module = new SourceTextModule(code, {
-      context,
-      identifier: moduleIdentifier,
-    });
-  
-    async function linker(specifier: string, referencingModule: Module): Promise<Module> {
-      if (specifier.startsWith('node:') || builtinModules.includes(specifier)) {
-        // Handle built-in modules
-        const mod = await import(specifier);
-        const exportNames = Object.keys(mod);
-  
-        return new SyntheticModule(
-          exportNames,
-          function () {
-            for (const name of exportNames) {
-              this.setExport(name, mod[name]);
-            }
-          },
-          {
-            context,
-            identifier: specifier,
-          },
-        );
-      } else {
-        let resolvedPath: string;
-  
-        if (specifier.startsWith('.') || specifier.startsWith('/')) {
-          // Resolve relative to the referencing module
-          const baseURL = referencingModule.identifier.startsWith('file://')
-            ? new URL('.', referencingModule.identifier).href
-            : path.dirname(referencingModule.identifier);
-  
-          resolvedPath = new URL(specifier, baseURL).href;
-        } else {
-          // Resolve modules from node_modules using require.resolve
-          const require = createRequire(
-            referencingModule.identifier.startsWith('file://')
-              ? fileURLToPath(referencingModule.identifier)
-              : referencingModule.identifier,
-          );
-  
-          try {
-            resolvedPath = pathToFileURL(require.resolve(specifier)).href;
-          } catch (e) {
-            throw new Error(`Cannot resolve module '${specifier}'`);
-          }
-        }
-  
-        const sourcePath = fileURLToPath(resolvedPath);
-  
-        let source: string;
-        try {
-          source = await readFile(sourcePath, 'utf-8');
-        } catch (e: any) {
-          throw new Error(`Cannot read module '${specifier}' at '${sourcePath}': ${e.message}`);
-        }
-  
-        const childModule = new SourceTextModule(source, {
-          context,
-          identifier: resolvedPath,
-        });
-  
-        await childModule.link(linker);
-  
-        return childModule;
-      }
+  worker.onmessage = (_event) => {
+    const event = _event.data as MessageFromWorker;
+    if (event.type === "instruction") {
+      emitter.emit("instruction", event.instruction);
+    } else if (event.type === "eval-result") {
+      emitter.emit("evalResult", { id: event.id, jsonString: event.jsonString });
     }
-  
-    await module.link(linker);
-    await module.evaluate();
+  };
+
+  function domImport(url: string) {
+    worker.postMessage({ type: "dom-import", url } as MessageToWorker);
+  }
+
+  function terminate() {
+    worker.terminate();
+  }
+
+  async function evalString(code: string): Promise<any> {
+    const id = randomUUID();
+    worker.postMessage({ type: "eval-string", code, id } as MessageToWorker);
+    return new Promise((resolve) => {
+      function listener(result: { id: string, jsonString: string }) {
+        if (result.id === id) {
+          emitter.removeListener("evalResult", listener);
+          resolve(JSON.parse(result.jsonString));
+        }
+      }
+      emitter.addListener("evalResult", listener);
+    });
   }
 
   return {
     emitter,
-    window,
-    document,
     dispatchEvent,
-    execute,
-    context
+    domImport,
+    terminate,
+    evalString
   }
 }

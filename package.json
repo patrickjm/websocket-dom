@@ -21,11 +21,11 @@
   ],
   "scripts": {
     "build:client": "vite build",
-    "build:server": "bun build src/index.tsx --outdir dist --target node --format esm --sourcemap=inline -e jsdom",
+    "build:server": "bun build src/index.ts --outdir dist --target node --format esm --sourcemap=inline -e jsdom",
     "build:types": "tsc",
     "clean": "touch ./dist && rm -r ./dist",
     "build": "yarn clean && yarn build:server && yarn build:client && yarn build:types",
-    "start": "vite build && tsx ./src/index.tsx",
+    "start": "vite build && tsx ./src/index.ts",
     "dev": "nodemon --watch src --watch vite.config.ts --watch index.html --watch public --ext ts,html,json,tsx --exec yarn start"
   },
   "exports": {

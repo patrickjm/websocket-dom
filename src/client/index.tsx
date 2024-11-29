@@ -1,4 +1,4 @@
-import type { EventMessage, Message } from "../messages";
+import type { EventMessage, Message } from "../ws-messages";
 import { NodeStash } from "../dom/nodes";
 import { debounce } from "../shared-utils";
 import { serializeEvent } from "./events";

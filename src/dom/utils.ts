@@ -1,3 +1,31 @@
+import type { SerializedEvent } from "client/types";
+import type { Serialized } from "./instructions";
+
+export type MessageToWorker = {
+  type: "init-dom";
+  doc: string;
+  url: string;
+} | {
+  type: "client-event";
+  event: SerializedEvent;
+} | {
+  type: "dom-import";
+  url: string;
+} | {
+  type: "eval-string";
+  code: string;
+  id: string;
+}
+
+export type MessageFromWorker = {
+  type: "instruction";
+  instruction: Serialized;
+} | {
+  type: "eval-result";
+  jsonString: string;
+  id: string;
+}
+
 export function createBrowserStorage() {
   let storage = new Map<string, string>();
   return {

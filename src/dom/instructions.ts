@@ -4,7 +4,7 @@ import type { NodeRef, NodeStash, StashedIdNodeRef } from "./nodes";
 
 export type DomEmitterEvents = {
   instruction: (instruction: Serialized) => void;
-  flush: () => void;
+  evalResult: (result: { id: string, jsonString: string }) => void;
 }
 export type DomEmitter = TypedEmitter<DomEmitterEvents>;
 

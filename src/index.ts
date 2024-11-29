@@ -1,11 +1,17 @@
+import { getXPath } from 'shared-utils';
 import { WebSocket } from 'ws';
 import { createDom } from './dom';
-import { SetAttribute, SetProperty, type Serialized } from './dom/instructions';
-import type { InstructionMessage, Message } from './messages';
-import { getXPath } from 'shared-utils';
+import { SetProperty, type Serialized } from './dom/instructions';
+import type { InstructionMessage, Message } from './ws-messages';
 
 export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
-  const { emitter, window, dispatchEvent, context, execute } = createDom(doc, { url });
+  const {
+    emitter,
+    dispatchEvent,
+    terminate,
+    domImport,
+    evalString
+  } = createDom(doc, { url });
 
   const batch: { instructions: Serialized[] } = { instructions: [] };
   function flush() {
@@ -21,21 +27,6 @@ export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
     batch.instructions.push(instruction);
     setTimeout(flush, 0);
   });
-  emitter.on('flush', () => {
-    flush();
-  });
-
-  // Send initial instructions
-  ws.send(JSON.stringify({
-    type: 'instructions',
-    instructions: [
-      SetProperty.serialize({
-        ref: { type: 'xpath', xpath: getXPath(window.document.body, window)! },
-        name: 'innerHTML',
-        value: window.document.body.innerHTML,
-      })
-    ]
-  }));
 
   // Handle messages from client
   ws.on('message', async (buffer) => {
@@ -46,8 +37,9 @@ export function createWebsocketDom(ws: WebSocket, doc: string, url: string) {
   });
 
   return {
-    window,
-    execute,
-    context,
+    terminate,
+    dispatchEvent,
+    domImport,
+    evalString
   };
 }
