@@ -33,5 +33,5 @@
     "noPropertyAccessFromIndexSignature": false
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.jsx"],
-  "exclude": ["node_modules", "dist", "public", "vite.config.ts"]
+  "exclude": ["node_modules", "dist", "public", "vite.config.ts", "e2e"]
 }

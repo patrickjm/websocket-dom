@@ -3,12 +3,7 @@ import { copyFileSync } from 'fs'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [{
-    name: 'copy-worker-types',
-    closeBundle() {
-      copyFileSync('src/dom/worker.d.ts', 'dist/worker.d.ts')
-    }
-  }],
+  plugins: [],
   server: {
     port: 3000,
   },
@@ -24,7 +19,8 @@ export default defineConfig({
     lib: {
       entry: {
         client: 'src/client/index.tsx',
-        worker: 'src/dom/worker.ts'
+        "worker-entrypoint": 'src/dom/worker-entrypoint.ts',
+        "worker": 'src/worker.ts'
       },
       formats: ['es'],
       fileName: (format, entryName) => `${entryName}.js`,

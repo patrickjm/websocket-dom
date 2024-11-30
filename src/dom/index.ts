@@ -1,17 +1,21 @@
 import { EventEmitter } from "events";
-import Worker from "web-worker";
+import _Worker from "web-worker";
 import type { SerializedEvent } from "../client/types";
 import { type DomEmitter } from "./mutations";
 import { type MessageFromWorker, type MessageToWorker } from "./utils";
 import { randomUUID } from "crypto";
 import type { WebsocketDOMLogger } from "index";
 
+// @ts-expect-error
+let Worker: typeof _Worker = _Worker.default ?? _Worker;
+
 /**
  * Returns functions and an emitter meant to encapsulate the jsdom worker
  */
 export function createDom(doc: string, { url, logger }: { url: string, logger?: WebsocketDOMLogger }) {
   const emitter = new EventEmitter() as DomEmitter;
-  const worker = new Worker(new URL("./worker.js", import.meta.url).toString());
+  console.log("worker", Worker)
+  const worker = new Worker(new URL("./worker-entrypoint.js", import.meta.url).toString());
 
   worker.postMessage({ type: "init-dom", doc, url } as MessageToWorker);
 

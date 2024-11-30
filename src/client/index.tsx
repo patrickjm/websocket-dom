@@ -67,7 +67,7 @@ export function createClient(url: string) {
     } else if (data.type === 'wsdom-err') {
       logger.error(data.error, data.errorInfo);
     } else if (data.type === 'wsdom-client-log') {
-      logger[data.level](...data.jsonStrings);
+      logger[data.level](...data.jsonStrings.map(val => JSON.parse(val)));
     }
   };
 

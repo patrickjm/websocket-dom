@@ -1,5 +1,12 @@
 # Based on https://raw.githubusercontent.com/github/gitignore/main/Node.gitignore
 
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+
 # Logs
 
 logs
@@ -119,6 +126,7 @@ out
 
 .nuxt
 dist
+e2e/dist
 
 # Gatsby files
 

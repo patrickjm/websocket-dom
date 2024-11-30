@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "types": ["node", "@playwright/test"],
+  },
+  "include": ["./**/*.ts", "../src/**/*.ts", "fixtures/test-worker.js", "fixtures/test-worker.js"],
+  "exclude": ["node_modules"]
+}

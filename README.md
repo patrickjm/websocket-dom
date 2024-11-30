@@ -28,6 +28,7 @@ const btn = document.createElement('button');
 btn.innerText = 'Click me';
 btn.addEventListener('click', () => {
   console.log('hello'); // <-- This will be printed in the server terminal
+  console.client.log('hello'); // <-- This will be printed in the client terminal
 });
 document.body.appendChild(btn);
 ```
