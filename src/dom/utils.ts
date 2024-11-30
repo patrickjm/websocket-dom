@@ -1,4 +1,4 @@
-import type { SerializedEvent } from "client/types";
+import type { SerializedEvent } from "../event";
 import type { SerializedMutation } from "./mutations";
 
 export type MessageToWorker = {

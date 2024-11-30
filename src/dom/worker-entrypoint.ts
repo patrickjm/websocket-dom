@@ -1,10 +1,11 @@
+import { EventEmitter } from "events";
 import { JSDOM } from "jsdom";
+import { deserializeEvent } from "../event";
+import { resolveXPath } from "../shared-utils";
+import { SetProperty, type DomEmitter } from "./mutations";
 import { NodeStash } from "./nodes";
 import { extendPrototypes } from "./prototypes";
-import { SetProperty, type DomEmitter } from "./mutations";
-import { EventEmitter } from "events";
 import { createBrowserStorage, type MessageFromWorker, type MessageToWorker } from "./utils";
-import { dispatchEvent } from "./events";
 
 let nodes: NodeStash;
 let dom: JSDOM;
@@ -106,8 +107,12 @@ _addEventListener("message", (event: MessageEvent<MessageToWorker>) => {
     const { doc, url } = event.data;
     initDom(doc, url);
   } else if (event.data.type === "client-event") {
+    const targetElement = event.data.event.target ? resolveXPath(event.data.event.target, dom.window.document) : null;
+    const wrappedEvent = deserializeEvent(dom.window, event.data.event);
     // Received a user event from the client browser
-    dispatchEvent(nodes, emitter, dom.window, event.data.event);
+    if (targetElement && wrappedEvent) {
+      targetElement.dispatchEvent(wrappedEvent);
+    }
   } else if (event.data.type === "dom-import") {
     // Received a request to import a js module
     const { url } = event.data;

@@ -1,6 +1,6 @@
-import { EventEmitter } from "events";
 import _Worker from "web-worker";
-import type { SerializedEvent } from "../client/types";
+import { EventEmitter } from "node:events";
+import type { SerializedEvent } from "../event";
 import { type DomEmitter } from "./mutations";
 import { type MessageFromWorker, type MessageToWorker } from "./utils";
 import { randomUUID } from "crypto";

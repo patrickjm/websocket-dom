@@ -1,8 +1,8 @@
-import type { EventMessage, Message } from "../ws-messages";
+import * as Mut from "../dom/mutations";
 import { NodeStash } from "../dom/nodes";
 import { debounce } from "../shared-utils";
-import { serializeEvent } from "./events";
-import * as Mut from "../dom/mutations";
+import type { EventMessage, Message } from "../ws-messages";
+import { serializeEvent } from "../event";
 
 /**
  * Creates a client that connects to a websocket-dom server and starts the sync.
@@ -71,7 +71,11 @@ export function createClient(url: string) {
     }
   };
 
-  function sendEvent(event: Event): void {
+  function captureEvent(event: Event): void {
+    if (!event.type.startsWith('key')) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
     const serializedEvent = serializeEvent(event);
     ws.send(JSON.stringify({
       type: 'wsdom-event',
@@ -81,10 +85,10 @@ export function createClient(url: string) {
 
   const eventTypes = ['click', 'keydown', 'keyup', 'input', 'change', 'submit', 'focus', 'blur', 'focusin', 'focusout'];
   eventTypes.forEach(eventType => {
-    document.addEventListener(eventType, sendEvent, true);
+    document.addEventListener(eventType, captureEvent, true);
   });
 
-  const debouncedSendMouseEvent = debounce(sendEvent, 250);
+  const debouncedSendMouseEvent = debounce(captureEvent, 250);
   const mouseEventTypes = ['mouseenter', 'mouseleave', 'mousemove', 'mouseout', 'mouseover'];
   mouseEventTypes.forEach(eventType => {
     document.addEventListener(eventType, debouncedSendMouseEvent, true);

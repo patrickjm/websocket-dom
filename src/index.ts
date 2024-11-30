@@ -1,10 +1,10 @@
 import EventEmitter from 'events';
 import type TypedEmitter from 'typed-emitter';
 import { WebSocket } from 'ws';
-import type { SerializedEvent } from './client/types';
 import { createDom } from './dom';
 import { type SerializedMutation } from './dom/mutations';
 import type { MutationMessage as MutationMessage, Message, ClientLogMessage } from './ws-messages';
+import type { SerializedEvent } from './event';
 
 export type {
   BaseSerializedEvent, SerializedChangeEvent,
@@ -13,7 +13,7 @@ export type {
   SerializedKeyboardEvent,
   SerializedMouseEvent,
   SerializedSubmitEvent
-} from './client/types';
+} from './event';
 export { getXPath } from './shared-utils';
 
 export type WebsocketDOMEvents = {

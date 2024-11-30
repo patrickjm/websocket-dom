@@ -2,6 +2,11 @@ import type { DOMWindow } from "jsdom";
 
 export type WindowLike = Window | DOMWindow;
 
+export function resolveXPath(xpath: XPath, document: Document): HTMLElement | null {
+  const FIRST_ORDERED_NODE_TYPE = 9;
+  return document.evaluate(xpath, document, null, FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
+}
+
 export function getXPath(node: Element | Text, window: WindowLike): XPath | null {
   // Node object not accessible on backend
   const TEXT_NODE = 3;
