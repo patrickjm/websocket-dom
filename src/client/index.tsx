@@ -15,12 +15,15 @@ export function createClient(url: string) {
 
   ws.onmessage = (event: MessageEvent) => {
     const data = JSON.parse(event.data) as Message;
-    if (data.type === 'instructions') {
+    if (data.type === 'wsdom-instr') {
       for (const instruction of data.instructions) {
         const [type] = instruction;
         switch (type) {
           case Instr.InstructionType.CreateElement:
             Instr.CreateElement.apply({ window, nodes }, Instr.CreateElement.deserialize(instruction as Instr.CreateElement.Serialized));
+            break;
+          case Instr.InstructionType.RemoveElement:
+            Instr.RemoveElement.apply({ window, nodes }, Instr.RemoveElement.deserialize(instruction as Instr.RemoveElement.Serialized));
             break;
           case Instr.InstructionType.SetAttribute:
             Instr.SetAttribute.apply({ window, nodes }, Instr.SetAttribute.deserialize(instruction as Instr.SetAttribute.Serialized));
@@ -60,7 +63,7 @@ export function createClient(url: string) {
             break;
         }
       }
-    } else if (data.type === 'error') {
+    } else if (data.type === 'wsdom-err') {
       console.error(data.error, data.errorInfo);
     }
   };
@@ -80,7 +83,7 @@ export function createClient(url: string) {
   function sendEvent(event: Event): void {
     const serializedEvent = serializeEvent(event);
     ws.send(JSON.stringify({
-      type: 'event',
+      type: 'wsdom-event',
       event: serializedEvent
     } as EventMessage));
   }

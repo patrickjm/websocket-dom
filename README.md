@@ -19,7 +19,7 @@ yarn add websocket-dom
 
 First, create your app code. This will run in a web-worker in the backend, but it feels just like client-side Javascript. 
 
-In your build step, you need to make sure the worker.js file is compiled to the `dist` folder separately as its own entrypoint.
+In your build step, you need to make sure the resulting `worker.js` file is compiled to the `dist` folder separately as its own entrypoint.
 
 Create `worker.ts`:
 
@@ -50,15 +50,21 @@ const __dirname = path.dirname(new URL(import.meta.url).pathname);
 wss.on('connection', (ws) => {
   // pass the websocket and the initial document
   const doc = '<!DOCTYPE html><html><body></body></html>';
-  const { domImport, terminate } = createWebsocketDom(ws, doc, { url: 'http://localhost:3000' });
+  const wsDom = new WebsocketDOM({
+    websocket: ws,
+    htmlDocument: doc,
+    url: 'http://localhost:3000'
+  })
 
   ws.on('close', () => {
-    terminate();
+    // This will destroy the backend dom upon disconnect.
+    // But you can support client reconnection by updating the websocket connection:
+    // wsDom.setWebsocket(newWs);
+    wsDom.terminate();
   });
 
-  // This must be a relative path to the compiled worker.js file in the dist folder,
-  // NOT the typescript file.
-  domImport(path.join(__dirname.replace('src', 'dist'), 'worker.js'));
+  // Import your compiled worker.js file
+  wsDom.import(path.join(__dirname.replace('src', 'dist'), 'worker.js'));
 });
 
 server.listen(3000, () => {
@@ -78,27 +84,25 @@ export const { ws } = createClient('ws://localhost:3000');
 
 On the backend, we create an isolated node worker that runs JSDOM. JSDOM classes are patched so that before mutations are applied (createElement, appendChild, etc.), they're intercepted, serialized, and sent to the frontend.
 
-The frontend receives the mutations and applies them to the DOM. User events like clicks, keyboard inputs, etc. are sent back over websocket to the backend where they're dispatched to JSDOM.
+The frontend receives the mutations and applies them to the real DOM. User events like clicks, keyboard inputs, etc. are sent back over websocket to the backend where they're dispatched to JSDOM.
 
 To keep the two sides in sync, it's strongly recommended that the only client-side code you load is from this library.
+
+## Limitations
+
+- The backend dom is not a real headless browser. It runs on jsdom, so any limitations of jsdom will apply here too (e.g. no browser history, no contenteditable, etc.)
+- Within jsdom, websocket-dom does not have full API coverage yet. There may be some events or DOM mutations that do not sync properly
 
 ## Open problems / todo
 - [ ] Manual flush / reset / sync
 - [ ] Comprehensive JSDOM api coverage
 - [ ] Multiple open connections on the same session
 - [ ] Event side effects (Input event -> value change -> cursor move)
-- [ ] Client reconnection
 - [ ] Experiment with client-sided dom mutation intercept
 - [ ] Embedding other jsdom documents as elements
 - [ ] Accessing element positions and sizes from the backend
 
-## Development
-
-Unfortunately, both bun and node are required to fully build this package at the moment.
-
-But just to develop, only node >= 22 is needed.
-
 ## Compatibility
 
-- Why no Bun?
-  - jsdom depends on node-canvas which is not supported by Bun, see: https://github.com/oven-sh/bun/issues/5835
+- Why no Bun or Deno support? Websocket-dom heavily depends on jsdom which is not supported by Deno or Bun
+    - Bun: jsdom depends on node-canvas which is not supported by Bun, see: https://github.com/oven-sh/bun/issues/5835

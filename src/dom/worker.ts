@@ -9,13 +9,38 @@ import { dispatchEvent } from "./events";
 let nodes: NodeStash;
 let dom: JSDOM;
 const emitter = new EventEmitter() as DomEmitter;
+
+// We want to override the global postMessage and addEventListener etc.
+// to have full control over message passing.
 const _postMessage: (msg: MessageFromWorker) => void = globalThis.postMessage;
+const _addEventListener: typeof globalThis.addEventListener = globalThis.addEventListener;
+const _removeEventListener: typeof globalThis.removeEventListener = globalThis.removeEventListener;
+
+let messageListeners: Set<(ev: MessageEvent<MessageFromWorker>) => void> = new Set();
 
 // @ts-expect-error
-postMessage = (...args: any[]) => {
-  throw new Error("websocket-dom does not support window.postMessage");
+globalThis.addEventListener = (type, listener) => {
+  if (type === "message") {
+    messageListeners.add(listener);
+  } else {
+    _addEventListener(type, listener);
+  }
 }
 
+// @ts-expect-error
+globalThis.removeEventListener = (type, listener) => {
+  if (type === "message") {
+    messageListeners.delete(listener);
+  } else {
+    _removeEventListener(type, listener);
+  }
+}
+
+globalThis.postMessage = (msg: any) => {
+  _postMessage({ type: "worker-message", jsonString: JSON.stringify(msg) });
+}
+
+// Initialize the dom globally
 function initDom(doc: string, url: string) {
   let globalThisAny = globalThis as any;
   dom = new JSDOM(
@@ -49,6 +74,7 @@ function initDom(doc: string, url: string) {
   });
 }
 
+// Send the body.innerHTML to the client
 function sendBodyInnerHTML() {
   _postMessage({
     type: "instruction",
@@ -61,22 +87,35 @@ function sendBodyInnerHTML() {
 }
 
 
-addEventListener("message", (event: MessageEvent<MessageToWorker>) => {
+// Handle messages from the client
+_addEventListener("message", (event: MessageEvent<MessageToWorker>) => {
   if (event.data.type === "init-dom") {
     const { doc, url } = event.data;
     initDom(doc, url);
-    sendBodyInnerHTML();
   } else if (event.data.type === "client-event") {
+    // Received a user event from the client browser
     dispatchEvent(nodes, emitter, dom.window, event.data.event);
   } else if (event.data.type === "dom-import") {
+    // Received a request to import a js module
     const { url } = event.data;
     import(url)
       .catch((err) => {
         console.error(`Error importing ${url}: ${err}`);
       });
   } else if (event.data.type === "eval-string") {
+    // Received a request to evaluate a string of code and return the result
     const { code, id } = event.data;
     const result = eval(code);
     _postMessage({ type: "eval-result", jsonString: JSON.stringify(result), id } as MessageFromWorker);
+  } else if (event.data.type === "worker-message") {
+    // Received an arbitrary message from the client to be passed to userland code
+    const msg = JSON.parse(event.data.jsonString);
+    const ev = new MessageEvent("message", { data: msg });
+    for (const listener of messageListeners) {
+      listener(ev);
+    }
+  } else if (event.data.type === "request-initial-dom") {
+    // Received a request to send the initial dom state to the client
+    sendBodyInnerHTML();
   }
 });

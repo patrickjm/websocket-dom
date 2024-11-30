@@ -1,5 +1,5 @@
 import type { DOMWindow } from "jsdom";
-import { AppendChild, CloneNode, CreateDocumentFragment, CreateElement, CreateTextNode, InsertAdjacentElement, InsertAdjacentHTML, InsertAdjacentText, Normalize, PrependChild, RemoveChild, SetAttribute, SetProperty, type DomEmitter } from "./instructions";
+import { AppendChild, CloneNode, CreateDocumentFragment, CreateElement, CreateTextNode, InsertAdjacentElement, InsertAdjacentHTML, InsertAdjacentText, Normalize, PrependChild, RemoveChild, SetAttribute, SetProperty, RemoveElement, type DomEmitter } from "./instructions";
 import { NodeStash } from "./nodes";
 
 export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: DomEmitter) {
@@ -34,6 +34,15 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
     const ref = nodes.stash(ret);
     emitter.emit('instruction', CloneNode.serialize({ ref, cloneId: ref.id, deep }));
     return ret;
+  };
+
+  const originalRemoveElement = window.Element.prototype.remove;
+  window.Element.prototype.remove = function() {
+    originalRemoveElement.call(this);
+    const ref = nodes.findRefFor(this as Node | Element);
+    if (ref) {
+      emitter.emit('instruction', RemoveElement.serialize({ ref }));
+    }
   };
 
   const originalInsertAdjacentElement = window.Element.prototype.insertAdjacentElement;
@@ -175,6 +184,7 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
   extendPrototypeProperties(window.Node.prototype, nodes, emitter);
   extendPrototypeProperties(window.Element.prototype, nodes, emitter);
   extendPrototypeProperties(window.Text.prototype, nodes, emitter);
+  extendPrototypeProperties(window.DocumentFragment.prototype, nodes, emitter);
   extendPrototypeProperties(window.HTMLElement.prototype, nodes, emitter);
   extendPrototypeProperties(window.HTMLInputElement.prototype, nodes, emitter);
   extendPrototypeProperties(window.HTMLTextAreaElement.prototype, nodes, emitter);
@@ -182,5 +192,5 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
   extendPrototypeProperties(window.HTMLAnchorElement.prototype, nodes, emitter);
   extendPrototypeProperties(window.HTMLImageElement.prototype, nodes, emitter);
   extendPrototypeProperties(window.HTMLFormElement.prototype, nodes, emitter);
-
+  extendPrototypeProperties(window.HTMLSelectElement.prototype, nodes, emitter);
 }

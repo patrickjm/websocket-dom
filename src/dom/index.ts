@@ -21,6 +21,8 @@ export function createDom(doc: string, { url }: { url: string }) {
       emitter.emit("instruction", event.instruction);
     } else if (event.type === "eval-result") {
       emitter.emit("evalResult", { id: event.id, jsonString: event.jsonString });
+    } else if (event.type === "worker-message") {
+      emitter.emit("workerMessage", JSON.parse(event.jsonString));
     }
   };
 
@@ -32,7 +34,11 @@ export function createDom(doc: string, { url }: { url: string }) {
     worker.terminate();
   }
 
-  async function evalString(code: string): Promise<any> {
+  function postWorkerMessage(message: unknown) {
+    worker.postMessage({ type: "worker-message", jsonString: JSON.stringify(message) } as MessageToWorker);
+  }
+
+  async function evalString(code: string): Promise<unknown> {
     const id = randomUUID();
     worker.postMessage({ type: "eval-string", code, id } as MessageToWorker);
     return new Promise((resolve) => {
@@ -46,12 +52,17 @@ export function createDom(doc: string, { url }: { url: string }) {
     });
   }
 
+  function requestInitialDom() {
+    worker.postMessage({ type: "request-initial-dom" } as MessageToWorker);
+  }
+
   return {
     emitter,
     dispatchEvent,
     domImport,
     terminate,
     evalString,
-    worker
+    postWorkerMessage,
+    requestInitialDom,
   }
 }

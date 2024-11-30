@@ -5,6 +5,7 @@ import type { NodeRef, NodeStash, StashedIdNodeRef } from "./nodes";
 export type DomEmitterEvents = {
   instruction: (instruction: Serialized) => void;
   evalResult: (result: { id: string, jsonString: string }) => void;
+  workerMessage: (message: unknown) => void;
 }
 export type DomEmitter = TypedEmitter<DomEmitterEvents>;
 
@@ -19,6 +20,7 @@ interface InstructionApplyArgs {
 
 export enum InstructionType {
   CreateElement = "createElement",
+  RemoveElement = "removeElement",
   CreateTextNode = "createTextNode",
   CreateDocumentFragment = "createDocumentFragment",
   RemoveChild = "removeChild",
@@ -57,6 +59,25 @@ export namespace CreateElement {
   }
 }
 
+export namespace RemoveElement {
+  export type Data = {
+    ref: NodeRef;
+  }
+  export type Serialized = [InstructionType.RemoveElement, NodeRef]
+  export function serialize(data: Data): Serialized {
+    return [InstructionType.RemoveElement, data.ref] as const;
+  }
+  export function deserialize(data: Serialized): Data {
+    return { ref: data[1] };
+  }
+  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('remove element', data);
+    const element = nodes.get(data.ref) as Element;
+    if (element) {
+      element.remove();
+    }
+  }
+}
 
 export namespace CreateTextNode {
   export type Data = {

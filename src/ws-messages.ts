@@ -2,18 +2,18 @@ import type { SerializedEvent } from "./client/types";
 import type { Serialized } from "./dom/instructions";
 
 export interface InstructionMessage {
-  type: 'instructions';
+  type: 'wsdom-instr';
   instructions: readonly Serialized[];
 }
 
 export interface ErrorMessage {
-  type: 'error';
+  type: 'wsdom-err';
   error: string;
   errorInfo: string;
 }
 
 export interface EventMessage {
-  type: 'event';
+  type: 'wsdom-event';
   event: SerializedEvent;
 }
 

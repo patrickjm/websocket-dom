@@ -15,6 +15,11 @@ export type MessageToWorker = {
   type: "eval-string";
   code: string;
   id: string;
+} | {
+  type: "worker-message";
+  jsonString: string;
+} | {
+  type: "request-initial-dom";
 }
 
 export type MessageFromWorker = {
@@ -24,6 +29,9 @@ export type MessageFromWorker = {
   type: "eval-result";
   jsonString: string;
   id: string;
+} | {
+  type: "worker-message";
+  jsonString: string;
 }
 
 export function createBrowserStorage() {

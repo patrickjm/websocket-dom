@@ -24,11 +24,14 @@ export function getXPath(node: Element | Text, window: WindowLike): XPath | null
   }
 
   const element = node as Element;
-  if (element.id !== '') {
-    return '//*[@id="' + element.id + '"]';
-  }
   if (element === window.document.body) {
     return '/html/body';
+  } else if (element === window.document.head) {
+    return '/html/head';
+  } else if (element === window.document.documentElement) {
+    return '/html';
+  } else if (element.id !== '') {
+    return '//*[@id="' + element.id + '"]';
   }
   let ix = 0;
   const siblings = element.parentNode?.childNodes;
