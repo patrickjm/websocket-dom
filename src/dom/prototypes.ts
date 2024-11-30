@@ -253,4 +253,37 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
     configurable: true,
     enumerable: true
   });
+  // Override textContent getter/setter
+  // Object.defineProperty(window.Node.prototype, 'textContent', {
+  //   get: function() {
+  //     // Get text content of all descendant text nodes
+  //     let text = '';
+  //     const walk = (node: Node) => {
+  //       if (node.nodeType === node.TEXT_NODE) {
+  //         text += (node as Text).data;
+  //       }
+  //       for (const child of node.childNodes) {
+  //         walk(child);
+  //       }
+  //     };
+  //     walk(this);
+  //     return text;
+  //   },
+  //   set: function(value: string) {
+  //     // Remove all child nodes
+  //     while (this.firstChild) {
+  //       this.removeChild(this.firstChild);
+  //     }
+  //     // Create and append a single text node
+  //     if (value !== '') {
+  //       this.appendChild(this.ownerDocument.createTextNode(value));
+  //     }
+  //     const ref = nodes.findRefFor(this as Node | Element);
+  //     if (ref) {
+  //       emitter.emit('mutation', SetProperty.serialize({ ref, name: 'textContent', value }));
+  //     }
+  //   },
+  //   configurable: true,
+  //   enumerable: true
+  // });
 }

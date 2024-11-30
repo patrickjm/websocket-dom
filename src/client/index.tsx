@@ -72,10 +72,9 @@ export function createClient(url: string) {
   };
 
   function captureEvent(event: Event): void {
-    if (!event.type.startsWith('key')) {
-      event.stopPropagation();
-      event.preventDefault();
-    }
+    event.stopPropagation();
+    event.preventDefault();
+    console.log('capturing event', event);
     const serializedEvent = serializeEvent(event);
     ws.send(JSON.stringify({
       type: 'wsdom-event',

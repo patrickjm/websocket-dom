@@ -6,6 +6,7 @@ import { SetProperty, type DomEmitter } from "./mutations";
 import { NodeStash } from "./nodes";
 import { extendPrototypes } from "./prototypes";
 import { createBrowserStorage, type MessageFromWorker, type MessageToWorker } from "./utils";
+import { simulateEvent } from "./simulate-event";
 
 let nodes: NodeStash;
 let dom: JSDOM;
@@ -107,12 +108,7 @@ _addEventListener("message", (event: MessageEvent<MessageToWorker>) => {
     const { doc, url } = event.data;
     initDom(doc, url);
   } else if (event.data.type === "client-event") {
-    const targetElement = event.data.event.target ? resolveXPath(event.data.event.target, dom.window.document) : null;
-    const wrappedEvent = deserializeEvent(dom.window, event.data.event);
-    // Received a user event from the client browser
-    if (targetElement && wrappedEvent) {
-      targetElement.dispatchEvent(wrappedEvent);
-    }
+    simulateEvent(event.data.event, dom.window);
   } else if (event.data.type === "dom-import") {
     // Received a request to import a js module
     const { url } = event.data;
