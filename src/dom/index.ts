@@ -1,11 +1,15 @@
 import { EventEmitter } from "events";
 import Worker from "web-worker";
 import type { SerializedEvent } from "../client/types";
-import { type DomEmitter } from "./instructions";
+import { type DomEmitter } from "./mutations";
 import { type MessageFromWorker, type MessageToWorker } from "./utils";
 import { randomUUID } from "crypto";
+import type { WebsocketDOMLogger } from "index";
 
-export function createDom(doc: string, { url }: { url: string }) {
+/**
+ * Returns functions and an emitter meant to encapsulate the jsdom worker
+ */
+export function createDom(doc: string, { url, logger }: { url: string, logger?: WebsocketDOMLogger }) {
   const emitter = new EventEmitter() as DomEmitter;
   const worker = new Worker(new URL("./worker.js", import.meta.url).toString());
 
@@ -17,12 +21,14 @@ export function createDom(doc: string, { url }: { url: string }) {
 
   worker.onmessage = (_event) => {
     const event = _event.data as MessageFromWorker;
-    if (event.type === "instruction") {
-      emitter.emit("instruction", event.instruction);
+    if (event.type === "mutation") {
+      emitter.emit("mutation", event.mutation);
     } else if (event.type === "eval-result") {
       emitter.emit("evalResult", { id: event.id, jsonString: event.jsonString });
     } else if (event.type === "worker-message") {
       emitter.emit("workerMessage", JSON.parse(event.jsonString));
+    } else if (event.type === "client-log") {
+      emitter.emit("clientLog", event.level, event.jsonStrings);
     }
   };
 

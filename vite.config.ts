@@ -1,8 +1,14 @@
 import { defineConfig } from 'vite'
+import { copyFileSync } from 'fs'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [],
+  plugins: [{
+    name: 'copy-worker-types',
+    closeBundle() {
+      copyFileSync('src/dom/worker.d.ts', 'dist/worker.d.ts')
+    }
+  }],
   server: {
     port: 3000,
   },

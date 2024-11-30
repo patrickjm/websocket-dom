@@ -2,7 +2,7 @@ import type { EventMessage, Message } from "../ws-messages";
 import { NodeStash } from "../dom/nodes";
 import { debounce } from "../shared-utils";
 import { serializeEvent } from "./events";
-import * as Instr from "../dom/instructions";
+import * as Mut from "../dom/mutations";
 
 /**
  * Creates a client that connects to a websocket-dom server and starts the sync.
@@ -11,73 +11,64 @@ import * as Instr from "../dom/instructions";
 export function createClient(url: string) {
   const ws = new WebSocket(url);
   const nodes = new NodeStash(window);
-  console.log('nodes', nodes);
+  const logger = console;
+  logger.debug('nodes', nodes);
 
   ws.onmessage = (event: MessageEvent) => {
     const data = JSON.parse(event.data) as Message;
-    if (data.type === 'wsdom-instr') {
-      for (const instruction of data.instructions) {
-        const [type] = instruction;
+    if (data.type === 'wsdom-mutation') {
+      for (const mutation of data.mutations) {
+        const [type] = mutation;
         switch (type) {
-          case Instr.InstructionType.CreateElement:
-            Instr.CreateElement.apply({ window, nodes }, Instr.CreateElement.deserialize(instruction as Instr.CreateElement.Serialized));
+          case Mut.MutationType.CreateElement:
+            Mut.CreateElement.apply({ window, nodes, logger }, Mut.CreateElement.deserialize(mutation as Mut.CreateElement.Serialized));
             break;
-          case Instr.InstructionType.RemoveElement:
-            Instr.RemoveElement.apply({ window, nodes }, Instr.RemoveElement.deserialize(instruction as Instr.RemoveElement.Serialized));
+          case Mut.MutationType.RemoveElement:
+            Mut.RemoveElement.apply({ window, nodes, logger }, Mut.RemoveElement.deserialize(mutation as Mut.RemoveElement.Serialized));
             break;
-          case Instr.InstructionType.SetAttribute:
-            Instr.SetAttribute.apply({ window, nodes }, Instr.SetAttribute.deserialize(instruction as Instr.SetAttribute.Serialized));
+          case Mut.MutationType.SetAttribute:
+            Mut.SetAttribute.apply({ window, nodes, logger }, Mut.SetAttribute.deserialize(mutation as Mut.SetAttribute.Serialized));
             break;
-          case Instr.InstructionType.SetProperty:
-            Instr.SetProperty.apply({ window, nodes }, Instr.SetProperty.deserialize(instruction as Instr.SetProperty.Serialized));
+          case Mut.MutationType.SetProperty:
+            Mut.SetProperty.apply({ window, nodes, logger }, Mut.SetProperty.deserialize(mutation as Mut.SetProperty.Serialized));
             break;
-          case Instr.InstructionType.AppendChild:
-            Instr.AppendChild.apply({ window, nodes }, Instr.AppendChild.deserialize(instruction as Instr.AppendChild.Serialized));
+          case Mut.MutationType.AppendChild:
+            Mut.AppendChild.apply({ window, nodes, logger }, Mut.AppendChild.deserialize(mutation as Mut.AppendChild.Serialized));
             break;
-          case Instr.InstructionType.CreateDocumentFragment:
-            Instr.CreateDocumentFragment.apply({ window, nodes }, Instr.CreateDocumentFragment.deserialize(instruction as Instr.CreateDocumentFragment.Serialized));
+          case Mut.MutationType.CreateDocumentFragment:
+            Mut.CreateDocumentFragment.apply({ window, nodes, logger }, Mut.CreateDocumentFragment.deserialize(mutation as Mut.CreateDocumentFragment.Serialized));
             break;
-          case Instr.InstructionType.CreateTextNode:
-            Instr.CreateTextNode.apply({ window, nodes }, Instr.CreateTextNode.deserialize(instruction as Instr.CreateTextNode.Serialized));
+          case Mut.MutationType.CreateTextNode:
+            Mut.CreateTextNode.apply({ window, nodes, logger }, Mut.CreateTextNode.deserialize(mutation as Mut.CreateTextNode.Serialized));
             break;
-          case Instr.InstructionType.RemoveChild:
-            Instr.RemoveChild.apply({ window, nodes }, Instr.RemoveChild.deserialize(instruction as Instr.RemoveChild.Serialized));
+          case Mut.MutationType.RemoveChild:
+            Mut.RemoveChild.apply({ window, nodes, logger }, Mut.RemoveChild.deserialize(mutation as Mut.RemoveChild.Serialized));
             break;
-          case Instr.InstructionType.CloneNode:
-            Instr.CloneNode.apply({ window, nodes }, Instr.CloneNode.deserialize(instruction as Instr.CloneNode.Serialized));
+          case Mut.MutationType.CloneNode:
+            Mut.CloneNode.apply({ window, nodes, logger }, Mut.CloneNode.deserialize(mutation as Mut.CloneNode.Serialized));
             break;
-          case Instr.InstructionType.InsertAdjacentElement:
-            Instr.InsertAdjacentElement.apply({ window, nodes }, Instr.InsertAdjacentElement.deserialize(instruction as Instr.InsertAdjacentElement.Serialized));
+          case Mut.MutationType.InsertAdjacentElement:
+            Mut.InsertAdjacentElement.apply({ window, nodes, logger }, Mut.InsertAdjacentElement.deserialize(mutation as Mut.InsertAdjacentElement.Serialized));
             break;
-          case Instr.InstructionType.InsertAdjacentHTML:
-            Instr.InsertAdjacentHTML.apply({ window, nodes }, Instr.InsertAdjacentHTML.deserialize(instruction as Instr.InsertAdjacentHTML.Serialized));
+          case Mut.MutationType.InsertAdjacentHTML:
+            Mut.InsertAdjacentHTML.apply({ window, nodes, logger }, Mut.InsertAdjacentHTML.deserialize(mutation as Mut.InsertAdjacentHTML.Serialized));
             break;
-          case Instr.InstructionType.InsertAdjacentText:
-            Instr.InsertAdjacentText.apply({ window, nodes }, Instr.InsertAdjacentText.deserialize(instruction as Instr.InsertAdjacentText.Serialized));
+          case Mut.MutationType.InsertAdjacentText:
+            Mut.InsertAdjacentText.apply({ window, nodes, logger }, Mut.InsertAdjacentText.deserialize(mutation as Mut.InsertAdjacentText.Serialized));
             break;
-          case Instr.InstructionType.PrependChild:
-            Instr.PrependChild.apply({ window, nodes }, Instr.PrependChild.deserialize(instruction as Instr.PrependChild.Serialized));
+          case Mut.MutationType.PrependChild:
+            Mut.PrependChild.apply({ window, nodes, logger }, Mut.PrependChild.deserialize(mutation as Mut.PrependChild.Serialized));
             break;
-          case Instr.InstructionType.Normalize:
-            Instr.Normalize.apply({ window, nodes }, Instr.Normalize.deserialize(instruction as Instr.Normalize.Serialized));
+          case Mut.MutationType.Normalize:
+            Mut.Normalize.apply({ window, nodes, logger }, Mut.Normalize.deserialize(mutation as Mut.Normalize.Serialized));
             break;
         }
       }
     } else if (data.type === 'wsdom-err') {
-      console.error(data.error, data.errorInfo);
+      logger.error(data.error, data.errorInfo);
+    } else if (data.type === 'wsdom-client-log') {
+      logger[data.level](...data.jsonStrings);
     }
-  };
-
-  ws.onopen = () => {
-    console.log('Connection opened');
-  };
-
-  ws.onerror = (error) => {
-    console.error('WebSocket error:', error);
-  };
-
-  ws.onclose = () => {
-    console.log('Connection closed');
   };
 
   function sendEvent(event: Event): void {

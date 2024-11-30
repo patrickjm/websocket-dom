@@ -1,7 +1,7 @@
 import { JSDOM } from "jsdom";
 import { NodeStash } from "./nodes";
 import { extendPrototypes } from "./prototypes";
-import { SetProperty, type DomEmitter } from "./instructions";
+import { SetProperty, type DomEmitter } from "./mutations";
 import { EventEmitter } from "events";
 import { createBrowserStorage, type MessageFromWorker, type MessageToWorker } from "./utils";
 import { dispatchEvent } from "./events";
@@ -69,21 +69,34 @@ function initDom(doc: string, url: string) {
   globalThisAny.localStorage = createBrowserStorage();
   globalThisAny.sessionStorage = createBrowserStorage();
 
-  emitter.on("instruction", (instruction) => {
-    _postMessage({ type: "instruction", instruction } as MessageFromWorker);
+  emitter.on("mutation", (mutation) => {
+    _postMessage({ type: "mutation", mutation } as MessageFromWorker);
   });
 }
 
 // Send the body.innerHTML to the client
 function sendBodyInnerHTML() {
   _postMessage({
-    type: "instruction",
-    instruction: SetProperty.serialize({
+    type: "mutation",
+    mutation: SetProperty.serialize({
       ref: { type: 'xpath', xpath: '/html/body' },
       name: 'innerHTML',
       value: dom.window.document.body.innerHTML,
     })
   } as MessageFromWorker);
+}
+
+// Allow logging to the client from the worker
+function logToClient(level: "log" | "debug" | "warn" | "error" | "trace", ...args: unknown[]) {
+  _postMessage({ type: "client-log", jsonStrings: args?.map(arg => JSON.stringify(arg)) ?? [], level } as MessageFromWorker);
+}
+// see worker.d.ts
+(console as any).client = {
+  log: logToClient.bind(null, "log"),
+  debug: logToClient.bind(null, "debug"),
+  warn: logToClient.bind(null, "warn"),
+  error: logToClient.bind(null, "error"),
+  trace: logToClient.bind(null, "trace"),
 }
 
 
@@ -100,7 +113,7 @@ _addEventListener("message", (event: MessageEvent<MessageToWorker>) => {
     const { url } = event.data;
     import(url)
       .catch((err) => {
-        console.error(`Error importing ${url}: ${err}`);
+        console.error(`WebsocketDOM Worker: Error importing ${url}: ${err}`);
       });
   } else if (event.data.type === "eval-string") {
     // Received a request to evaluate a string of code and return the result

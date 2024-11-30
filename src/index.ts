@@ -3,8 +3,8 @@ import type TypedEmitter from 'typed-emitter';
 import { WebSocket } from 'ws';
 import type { SerializedEvent } from './client/types';
 import { createDom } from './dom';
-import { type Serialized } from './dom/instructions';
-import type { InstructionMessage, Message } from './ws-messages';
+import { type SerializedMutation } from './dom/mutations';
+import type { MutationMessage as MutationMessage, Message, ClientLogMessage } from './ws-messages';
 
 export type {
   BaseSerializedEvent, SerializedChangeEvent,
@@ -34,6 +34,8 @@ export type WebsocketDOMOptions = {
   htmlDocument: string;
   /** The URL that the client is running at */
   url: string;
+  /** The logger to use */
+  logger?: WebsocketDOMLogger;
 }
 
 /**
@@ -44,7 +46,7 @@ export class WebsocketDOM {
   private doc: string;
   private url: string;
   private emitter: TypedEmitter<WebsocketDOMEvents>;
-  private batch: { instructions: Serialized[] } = { instructions: [] };
+  private batch: { mutations: SerializedMutation[] } = { mutations: [] };
   private dom: ReturnType<typeof createDom>;
 
   constructor(options: WebsocketDOMOptions) {
@@ -52,16 +54,29 @@ export class WebsocketDOM {
     this.doc = options.htmlDocument;
     this.url = options.url;
     this.emitter = new EventEmitter() as TypedEmitter<WebsocketDOMEvents>;
-    this.dom = createDom(this.doc, { url: this.url });
+    this.dom = createDom(this.doc, {
+      url: this.url,
+      logger: options.logger
+    });
 
-    this.dom.emitter.on('instruction', (instruction: Serialized) => {
-      this.batch.instructions.push(instruction);
+    this.dom.emitter.on('mutation', (mutation: SerializedMutation) => {
+      this.batch.mutations.push(mutation);
       setTimeout(this.flush.bind(this), 0);
+    });
+
+    this.dom.emitter.on('clientLog', (level, jsonStrings) => {
+      if (this.isConnected()) {
+        this.ws!.send(JSON.stringify({ type: 'wsdom-client-log', jsonStrings, level } as ClientLogMessage));
+      }
     });
 
     if (this.ws) {
       this.setWebsocket(this.ws);
     }
+  }
+
+  isConnected() {
+    return this.ws && this.ws.readyState === WebSocket.OPEN;
   }
 
   /**
@@ -98,8 +113,8 @@ export class WebsocketDOM {
    * Terminates the websocket connection and the dom
    */
   terminate(): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.close();
+    if (this.isConnected()) {
+      this.ws!.close();
     }
     this.dom.terminate();
   }
@@ -112,16 +127,16 @@ export class WebsocketDOM {
   }
 
   /**
-   * Sends the current batch of instructions to the client and removes them from the queue
+   * Sends the current batch of mutations to the client and removes them from the queue
    */
   flush(): void {
-    if (this.batch.instructions.length === 0) {
+    if (this.batch.mutations.length === 0) {
       return;
     }
-    const instr = this.batch.instructions.slice();
-    this.batch.instructions = [];
+    const mut = this.batch.mutations.slice();
+    this.batch.mutations = [];
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'wsdom-instr', instructions: instr } as InstructionMessage));
+      this.ws.send(JSON.stringify({ type: 'wsdom-mutation', mutations: mut } as MutationMessage));
     }
   }
 

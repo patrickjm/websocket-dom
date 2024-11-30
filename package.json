@@ -5,6 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "version": "0.4.0",
+  "engines": {
+    "node": ">=22"
+  },
   "description": "Experimental 2-way sync between backend JSDOM and frontend DOM using WebSockets",
   "repository": "https://github.com/patrickjm/websocket-dom",
   "author": "Patrick Moriarty <patrick@moriarty.dev>",
@@ -38,6 +41,9 @@
     "./client": {
       "import": "./dist/client.js",
       "types": "./dist/client/index.d.ts"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts"
     }
   },
   "packageManager": "yarn@1.22.22",

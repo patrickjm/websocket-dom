@@ -1,24 +1,27 @@
 import type TypedEmitter from "typed-emitter";
 import type { NodeRef, NodeStash, StashedIdNodeRef } from "./nodes";
+import type { WebsocketDOMLogger } from "index";
 
 
 export type DomEmitterEvents = {
-  instruction: (instruction: Serialized) => void;
+  mutation: (mutation: SerializedMutation) => void;
   evalResult: (result: { id: string, jsonString: string }) => void;
   workerMessage: (message: unknown) => void;
+  clientLog: (level: "log" | "debug" | "warn" | "error" | "trace", jsonStrings: string[]) => void;
 }
 export type DomEmitter = TypedEmitter<DomEmitterEvents>;
 
 
 
-export type Serialized = readonly any[];
+export type SerializedMutation = readonly any[];
 
-interface InstructionApplyArgs {
+interface MutationApplyArgs {
   window: Window;
   nodes: NodeStash;
+  logger?: WebsocketDOMLogger;
 }
 
-export enum InstructionType {
+export enum MutationType {
   CreateElement = "createElement",
   RemoveElement = "removeElement",
   CreateTextNode = "createTextNode",
@@ -41,9 +44,9 @@ export namespace CreateElement {
     refId: StashedIdNodeRef['id'];
     is?: string;
   }
-  export type Serialized = [InstructionType.CreateElement, string, StashedIdNodeRef['id'], string?]
+  export type Serialized = [MutationType.CreateElement, string, StashedIdNodeRef['id'], string?]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.CreateElement, data.tagName, data.refId, data.is] as const;
+    return [MutationType.CreateElement, data.tagName, data.refId, data.is] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -52,8 +55,8 @@ export namespace CreateElement {
       is: data[3],
     }
   }
-  export function apply({ window, nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('create element', data);
+  export function apply({ window, nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: CreateElement', data);
     const element = window.document.createElement(data.tagName, { is: data.is });
     nodes.stash(element, data.refId);
   }
@@ -63,15 +66,15 @@ export namespace RemoveElement {
   export type Data = {
     ref: NodeRef;
   }
-  export type Serialized = [InstructionType.RemoveElement, NodeRef]
+  export type Serialized = [MutationType.RemoveElement, NodeRef]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.RemoveElement, data.ref] as const;
+    return [MutationType.RemoveElement, data.ref] as const;
   }
   export function deserialize(data: Serialized): Data {
     return { ref: data[1] };
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('remove element', data);
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: RemoveElement', data);
     const element = nodes.get(data.ref) as Element;
     if (element) {
       element.remove();
@@ -84,9 +87,9 @@ export namespace CreateTextNode {
     data: string;
     refId: StashedIdNodeRef['id'];
   }
-  export type Serialized = [InstructionType.CreateTextNode, string, StashedIdNodeRef['id']]
+  export type Serialized = [MutationType.CreateTextNode, string, StashedIdNodeRef['id']]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.CreateTextNode, data.data, data.refId] as const;
+    return [MutationType.CreateTextNode, data.data, data.refId] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -94,8 +97,8 @@ export namespace CreateTextNode {
       refId: data[2],
     }
   }
-  export function apply({ window, nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('create text node', data);
+  export function apply({ window, nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: CreateTextNode', data);
     const text = window.document.createTextNode(data.data);
     nodes.stash(text, data.refId);
   }
@@ -105,17 +108,17 @@ export namespace CreateDocumentFragment {
   export type Data = {
     refId: StashedIdNodeRef['id'];
   }
-  export type Serialized = [InstructionType.CreateDocumentFragment, StashedIdNodeRef['id']]
+  export type Serialized = [MutationType.CreateDocumentFragment, StashedIdNodeRef['id']]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.CreateDocumentFragment, data.refId] as const;
+    return [MutationType.CreateDocumentFragment, data.refId] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
       refId: data[1],
     }
   }
-  export function apply({ window, nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('create document fragment', data);
+  export function apply({ window, nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: CreateDocumentFragment', data);
     const fragment = window.document.createDocumentFragment();
     nodes.stash(fragment, data.refId);
   }
@@ -126,9 +129,9 @@ export namespace RemoveChild {
     parentRef: NodeRef;
     childRef: NodeRef;
   }
-  export type Serialized = [InstructionType.RemoveChild, NodeRef, NodeRef]
+  export type Serialized = [MutationType.RemoveChild, NodeRef, NodeRef]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.RemoveChild, data.parentRef, data.childRef] as const;
+    return [MutationType.RemoveChild, data.parentRef, data.childRef] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -136,8 +139,8 @@ export namespace RemoveChild {
       childRef: data[2],
     }
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('remove child', data);
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: RemoveChild', data);
     const parent = nodes.get(data.parentRef);
     const child = nodes.get(data.childRef);
     if (parent && child) {
@@ -151,9 +154,9 @@ export namespace AppendChild {
     parent: NodeRef;
     child: StashedIdNodeRef['id'];
   }
-  export type Serialized = [InstructionType.AppendChild, NodeRef, StashedIdNodeRef['id']]
+  export type Serialized = [MutationType.AppendChild, NodeRef, StashedIdNodeRef['id']]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.AppendChild, data.parent, data.child] as const;
+    return [MutationType.AppendChild, data.parent, data.child] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -161,8 +164,8 @@ export namespace AppendChild {
       child: data[2],
     }
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('append child', data);
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: AppendChild', data);
     const parent = nodes.get(data.parent);
     const childRef = { type: "stashed-id", id: data.child } as StashedIdNodeRef;
     const child = nodes.get(childRef);
@@ -179,9 +182,9 @@ export namespace SetProperty {
     name: string;
     value: string;
   }
-  export type Serialized = [InstructionType.SetProperty, NodeRef, string, string]
+  export type Serialized = [MutationType.SetProperty, NodeRef, string, string]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.SetProperty, data.ref, data.name, data.value] as const;
+    return [MutationType.SetProperty, data.ref, data.name, data.value] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -190,9 +193,9 @@ export namespace SetProperty {
       value: data[3],
     }
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
     const element = nodes.get(data.ref);
-    console.log('set property', data);
+    logger?.debug('WebsocketDOM Mutation: SetProperty', data);
     if (element) {
       (element as any)[data.name] = data.value;
     }
@@ -205,9 +208,9 @@ export namespace SetAttribute {
     name: string;
     value: string;
   }
-  export type Serialized = [InstructionType.SetAttribute, NodeRef, string, string]
+  export type Serialized = [MutationType.SetAttribute, NodeRef, string, string]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.SetAttribute, data.ref, data.name, data.value] as const;
+    return [MutationType.SetAttribute, data.ref, data.name, data.value] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -216,8 +219,8 @@ export namespace SetAttribute {
       value: data[3],
     }
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('set attribute', data);
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: SetAttribute', data);
     const element = nodes.get(data.ref);
     if (element && element instanceof Element) {
       element.setAttribute(data.name, data.value);
@@ -231,9 +234,9 @@ export namespace CloneNode {
     cloneId: StashedIdNodeRef['id'];
     deep: boolean;
   }
-  export type Serialized = [InstructionType.CloneNode, NodeRef, StashedIdNodeRef['id'], boolean]
+  export type Serialized = [MutationType.CloneNode, NodeRef, StashedIdNodeRef['id'], boolean]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.CloneNode, data.ref, data.cloneId, data.deep] as const;
+    return [MutationType.CloneNode, data.ref, data.cloneId, data.deep] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -242,8 +245,8 @@ export namespace CloneNode {
       deep: data[3],
     }
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('clone node', data);
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: CloneNode', data);
     const node = nodes.get(data.ref);
     const clonedNode = node!.cloneNode(data.deep);
     nodes.stash(clonedNode, data.cloneId);
@@ -256,9 +259,9 @@ export namespace InsertAdjacentElement {
     where: 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend';
     element: StashedIdNodeRef['id'];
   }
-  export type Serialized = [InstructionType.InsertAdjacentElement, NodeRef, 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend', StashedIdNodeRef['id']]
+  export type Serialized = [MutationType.InsertAdjacentElement, NodeRef, 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend', StashedIdNodeRef['id']]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.InsertAdjacentElement, data.ref, data.where, data.element] as const;
+    return [MutationType.InsertAdjacentElement, data.ref, data.where, data.element] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -267,8 +270,8 @@ export namespace InsertAdjacentElement {
       element: data[3],
     }
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('insert adjacent element', data);
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: InsertAdjacentElement', data);
     const element = nodes.get(data.ref) as Element;
     const toInsert = nodes.get({ type: "stashed-id", id: data.element } as StashedIdNodeRef)!;
     if (element && toInsert) {
@@ -283,9 +286,9 @@ export namespace InsertAdjacentHTML {
     where: 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend';
     html: string;
   }
-  export type Serialized = [InstructionType.InsertAdjacentHTML, NodeRef, 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend', string]
+  export type Serialized = [MutationType.InsertAdjacentHTML, NodeRef, 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend', string]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.InsertAdjacentHTML, data.ref, data.where, data.html] as const;
+    return [MutationType.InsertAdjacentHTML, data.ref, data.where, data.html] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -294,8 +297,8 @@ export namespace InsertAdjacentHTML {
       html: data[3],
     }
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('insert adjacent HTML', data);
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: InsertAdjacentHTML', data);
     const element = nodes.get(data.ref) as Element;
     if (element) {
       element.insertAdjacentHTML(data.where, data.html);
@@ -309,9 +312,9 @@ export namespace InsertAdjacentText {
     where: 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend';
     text: string;
   }
-  export type Serialized = [InstructionType.InsertAdjacentText, NodeRef, 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend', string]
+  export type Serialized = [MutationType.InsertAdjacentText, NodeRef, 'beforebegin' | 'afterbegin' | 'beforeend' | 'afterend', string]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.InsertAdjacentText, data.ref, data.where, data.text] as const;
+    return [MutationType.InsertAdjacentText, data.ref, data.where, data.text] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -320,8 +323,8 @@ export namespace InsertAdjacentText {
       text: data[3],
     }
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('insert adjacent text', data);
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: InsertAdjacentText', data);
     const element = nodes.get(data.ref) as Element;
     if (element) {
       element.insertAdjacentText(data.where, data.text);
@@ -334,9 +337,9 @@ export namespace PrependChild {
     parent: NodeRef;
     child: StashedIdNodeRef['id'] | string;
   }
-  export type Serialized = [InstructionType.PrependChild, NodeRef, StashedIdNodeRef['id'] | string]
+  export type Serialized = [MutationType.PrependChild, NodeRef, StashedIdNodeRef['id'] | string]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.PrependChild, data.parent, data.child] as const;
+    return [MutationType.PrependChild, data.parent, data.child] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
@@ -344,8 +347,8 @@ export namespace PrependChild {
       child: data[2],
     }
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('prepend child', data);
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: PrependChild', data);
     const parent = nodes.get(data.parent) as Element;
     let child: Node;
     if (typeof data.child === 'string') {
@@ -367,17 +370,17 @@ export namespace Normalize {
   export type Data = {
     ref: NodeRef;
   }
-  export type Serialized = [InstructionType.Normalize, NodeRef]
+  export type Serialized = [MutationType.Normalize, NodeRef]
   export function serialize(data: Data): Serialized {
-    return [InstructionType.Normalize, data.ref] as const;
+    return [MutationType.Normalize, data.ref] as const;
   }
   export function deserialize(data: Serialized): Data {
     return {
       ref: data[1],
     }
   }
-  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
-    console.log('normalize', data);
+  export function apply({ nodes, logger }: MutationApplyArgs, data: Data): void {
+    logger?.debug('WebsocketDOM Mutation: Normalize', data);
     const node = nodes.get(data.ref);
     if (node) {
       node.normalize();

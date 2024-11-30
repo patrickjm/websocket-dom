@@ -1,5 +1,5 @@
 import type { SerializedEvent } from "client/types";
-import type { Serialized } from "./instructions";
+import type { SerializedMutation } from "./mutations";
 
 export type MessageToWorker = {
   type: "init-dom";
@@ -23,8 +23,8 @@ export type MessageToWorker = {
 }
 
 export type MessageFromWorker = {
-  type: "instruction";
-  instruction: Serialized;
+  type: "mutation";
+  mutation: SerializedMutation;
 } | {
   type: "eval-result";
   jsonString: string;
@@ -32,6 +32,10 @@ export type MessageFromWorker = {
 } | {
   type: "worker-message";
   jsonString: string;
+} | {
+  type: "client-log";
+  jsonStrings: string[];
+  level: "log" | "debug" | "warn" | "error" | "trace";
 }
 
 export function createBrowserStorage() {
