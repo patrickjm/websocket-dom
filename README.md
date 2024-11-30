@@ -1,6 +1,7 @@
 # websocket-dom
 
-![NPM Version](https://img.shields.io/npm/v/websocket-dom)
+![NPM Version](https://img.shields.io/npm/v/websocket-dom) ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/patrickjm/websocket-dom/.github%2Fworkflows%2Frun-tests.yml?branch=main&label=Automated%20tests)
+
 
 Experimental partial 2-way sync between backend JSDOM and frontend DOM using WebSockets.
 
