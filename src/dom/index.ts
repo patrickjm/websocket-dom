@@ -15,7 +15,6 @@ let Worker: typeof _Worker = _Worker.default ?? _Worker;
  */
 export function createDom(doc: string, { url, logger }: { url: string, logger?: WebsocketDOMLogger }) {
   const emitter = new EventEmitter() as DomEmitter;
-  console.log("worker", Worker)
   const worker = new Worker(new URL("./worker-entrypoint.js", import.meta.url).toString());
 
   worker.postMessage({ type: "init-dom", doc, url } as MessageToWorker);
