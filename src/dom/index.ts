@@ -6,6 +6,7 @@ import { type MessageFromWorker, type MessageToWorker } from "./utils";
 import { randomUUID } from "crypto";
 import type { WebsocketDOMLogger } from "index";
 
+// Hack to get around some esm issue running the lib in playwright tests
 // @ts-expect-error
 let Worker: typeof _Worker = _Worker.default ?? _Worker;
 
