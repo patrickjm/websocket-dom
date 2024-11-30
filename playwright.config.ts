@@ -15,7 +15,7 @@ export default defineConfig({
     command: 'yarn build && yarn e2e:server',
     url: 'http://localhost:3333',
     reuseExistingServer: !process.env.CI,
-    timeout: 120000,
+    timeout: 5000,
     stdout: 'pipe',
     stderr: 'pipe',
   },

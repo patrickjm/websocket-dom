@@ -113,6 +113,25 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
     return ret;
   };
 
+  // Override innerHTML getter/setter 
+  const originalInnerHTMLDescriptor = Object.getOwnPropertyDescriptor(window.Element.prototype, 'innerHTML');
+  if (originalInnerHTMLDescriptor) {
+    Object.defineProperty(window.Element.prototype, 'innerHTML', {
+      get: function() {
+        return originalInnerHTMLDescriptor.get?.call(this);
+      },
+      set: function(value: string) {
+        originalInnerHTMLDescriptor.set?.call(this, value);
+        const ref = nodes.findRefFor(this as Node | Element);
+        if (ref) {
+          emitter.emit('mutation', SetProperty.serialize({ ref, name: 'innerHTML', value }));
+        }
+      },
+      configurable: true,
+      enumerable: true
+    });
+  }
+
   // Extend Document prototype
   const originalCreateElement = window.Document.prototype.createElement;
   window.Document.prototype.createElement = function(tagName: string, options?: ElementCreationOptions): HTMLElement {
@@ -190,4 +209,48 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
   extendPrototypeProperties(window.HTMLImageElement.prototype, nodes, emitter);
   extendPrototypeProperties(window.HTMLFormElement.prototype, nodes, emitter);
   extendPrototypeProperties(window.HTMLSelectElement.prototype, nodes, emitter);
+
+
+  // Custom implementations (must come after all other prototypes are extended)
+  // Override innerText getter/setter
+  Object.defineProperty(window.Element.prototype, 'innerText', {
+    get: function() {
+      // Recursively get text content of element and descendants
+      let text = '';
+      const walk = (node: Node) => {
+        if (node.nodeType === node.TEXT_NODE) {
+          text += (node as Text).data;
+        } else if (node.nodeType === node.ELEMENT_NODE) {
+          const style = window.getComputedStyle(node as Element);
+          if (style.display !== 'none') {
+            for (const child of node.childNodes) {
+              walk(child);
+            }
+            // Add newlines for block elements
+            if (style.display === 'block' || style.display === 'list-item') {
+              text += '\n';
+            }
+          }
+        }
+      };
+      walk(this);
+      return text.trim();
+    },
+    set: function(value: string) {
+      // Remove all child nodes
+      while (this.firstChild) {
+        this.removeChild(this.firstChild);
+      }
+      // Create and append a single text node
+      if (value !== '') {
+        this.appendChild(this.ownerDocument.createTextNode(value));
+      }
+      const ref = nodes.findRefFor(this as Node | Element);
+      if (ref) {
+        emitter.emit('mutation', SetProperty.serialize({ ref, name: 'innerText', value }));
+      }
+    },
+    configurable: true,
+    enumerable: true
+  });
 }
