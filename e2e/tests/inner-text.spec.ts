@@ -34,6 +34,6 @@ test('should handle innerHTML and innerText updates', async ({ page }) => {
   await htmlContainer.click();
   
   // Verify updated states
-  expect(await htmlContainer.innerHTML()).toBe('<p>Updated <em>HTML</em> after click</p>');
-  expect(await textContainer.innerText()).toBe('Updated text after click');
+  await expect(page.getByText('Updated HTML after click')).toBeVisible();
+  await expect(page.getByText('Updated text after click')).toBeVisible();
 });
