@@ -10,33 +10,41 @@ Fully control the client document and respond to user events from the backend.
 **Compatibility**: NodeJS v22+ with ESM.
 
 ```mermaid
-flowchart LR
-  subgraph Frontend["Frontend (Browser)"]
-      direction TB
-      Client["Real DOM"]
-      ClientWS["WebSocket"]
+```mermaid
+graph TB
+  subgraph Frontend
+      Client[Client DOM]
+      ClientWS[WebSocket Client]
   end
 
-  subgraph Backend["Backend (Node.js)"]
-      direction TB
-      ServerWS["WebSocket"]
-      subgraph Worker["Web Worker"]
-          JSDOM["JSDOM"]
+  subgraph Backend
+      ServerWS[WebSocket Server]
+      subgraph Worker[Web Worker]
+          JSDOM[JSDOM Instance]
+          Proto[Patched Prototypes]
       end
   end
 
-  Client -->|Events| ClientWS
-  ClientWS <-->|WebSocket| ServerWS
-  ServerWS <--> Worker
-  JSDOM -->|DOM Mutations| ServerWS
+  %% Data flow
+  Client -->|DOM Events| ClientWS
+  ClientWS -->|Events| ServerWS
+  ServerWS -->|Events| JSDOM
+  JSDOM -->|DOM Mutations| Proto
+  Proto -->|Serialized Instructions| ServerWS
+  ServerWS -->|Mutation Patches| ClientWS
+  ClientWS -->|Apply Mutations| Client
 
   %% Styling
-  classDef default fill:#f5f5f5,stroke:#333,stroke-width:1px
-  classDef container fill:none,stroke:#bbb,stroke-width:1px
-  classDef worker fill:#fff5fa,stroke:#d4b5d0,stroke-width:1px
+  classDef worker fill:#f8f0ff,stroke:#8a63d2,stroke-width:2px,color:#4a2b82
+  classDef frontend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#0d47a1
+  classDef backend fill:#f1f8e9,stroke:#689f38,stroke-width:2px,color:#33691e
   
-  class Frontend,Backend container
   class Worker worker
+  class Client,ClientWS frontend
+  class ServerWS,JSDOM,Proto backend
+
+  %% Link styling
+  linkStyle default stroke:#333,stroke-width:2px,color:#333
 ```
 
 ## Usage
