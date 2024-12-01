@@ -10,7 +10,6 @@ Fully control the client document and respond to user events from the backend.
 **Compatibility**: NodeJS v22+ with ESM.
 
 ```mermaid
-```mermaid
 graph TB
   subgraph Frontend
       Client[Client DOM]
