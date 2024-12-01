@@ -9,6 +9,36 @@ Fully control the client document and respond to user events from the backend.
 
 **Compatibility**: NodeJS v22+ with ESM.
 
+```mermaid
+flowchart LR
+  subgraph Frontend["Frontend (Browser)"]
+      direction TB
+      Client["Real DOM"]
+      ClientWS["WebSocket"]
+  end
+
+  subgraph Backend["Backend (Node.js)"]
+      direction TB
+      ServerWS["WebSocket"]
+      subgraph Worker["Web Worker"]
+          JSDOM["JSDOM"]
+      end
+  end
+
+  Client -->|Events| ClientWS
+  ClientWS <-->|WebSocket| ServerWS
+  ServerWS <--> Worker
+  JSDOM -->|DOM Mutations| ServerWS
+
+  %% Styling
+  classDef default fill:#f5f5f5,stroke:#333,stroke-width:1px
+  classDef container fill:none,stroke:#bbb,stroke-width:1px
+  classDef worker fill:#fff5fa,stroke:#d4b5d0,stroke-width:1px
+  
+  class Frontend,Backend container
+  class Worker worker
+```
+
 ## Usage
 
 Installation:
