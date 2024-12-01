@@ -5,11 +5,10 @@ import type { EventMessage, Message } from "../ws-messages";
 import { serializeEvent } from "../event";
 
 /**
- * Creates a client that connects to a websocket-dom server and starts the sync.
- * @param uri The URI to connect to, e.g. ws://localhost:3000
+ * Uses a websocket connection to sync the client browser with the server.
+ * @param ws The websocket connection to use.
  */
-export function createClient(url: string) {
-  const ws = new WebSocket(url);
+export function createWebsocketDOMClient(ws: WebSocket) {
   const nodes = new NodeStash(window);
   const logger = console;
   logger.debug('nodes', nodes);

@@ -1,6 +1,7 @@
-import { createClient } from "../../src/client";
+import { createWebsocketDOMClient } from "../../src/client";
 
-export const { ws } = createClient('ws://localhost:3333');
+export const ws = new WebSocket('ws://localhost:3333');
+createWebsocketDOMClient(ws);
 
 ws.onopen = () => {
   console.log('Connection opened');

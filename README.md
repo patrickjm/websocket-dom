@@ -77,9 +77,10 @@ server.listen(3000, () => {
 Next we need to set up the client code that actually runs in the browser. This will require a bundler. It will automatically create a websocket connection, watch for client-side events, and update the DOM from backend mutations:
 
 ```ts
-import { createClient } from "websocket-dom/client";
+import { createWebsocketDOMClient } from "websocket-dom/client";
 
-export const { ws } = createClient('ws://localhost:3000');
+export const ws = new WebSocket('ws://localhost:3000');
+createWebsocketDOMClient(ws);
 ```
 
 ## How it works
