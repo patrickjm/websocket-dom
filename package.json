@@ -1,8 +1,13 @@
 {
   "name": "websocket-dom",
-  "module": "src/index.ts",
   "type": "module",
-  "version": "0.3.0",
+  "module": "dist/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "version": "0.4.0",
+  "engines": {
+    "node": ">=22"
+  },
   "description": "Experimental 2-way sync between backend JSDOM and frontend DOM using WebSockets",
   "repository": "https://github.com/patrickjm/websocket-dom",
   "author": "Patrick Moriarty <patrick@moriarty.dev>",
@@ -21,12 +26,13 @@
   ],
   "scripts": {
     "build:client": "vite build",
-    "build:server": "bun build src/index.ts --outdir dist --target node --format esm --sourcemap=inline -e jsdom",
+    "build:server": "yarn bun build src/index.ts --outdir dist --target node --format esm --sourcemap=inline -e jsdom",
     "build:types": "tsc",
-    "clean": "touch ./dist && rm -r ./dist",
-    "build": "yarn clean && yarn build:server && yarn build:client && yarn build:types",
-    "start": "vite build && tsx ./src/index.ts",
-    "dev": "nodemon --watch src --watch vite.config.ts --watch index.html --watch public --ext ts,html,json,tsx --exec yarn start"
+    "build:e2e": "vite build -c e2e/vite.config.ts",
+    "build": "yarn clean && yarn build:server && yarn build:client && yarn build:types && yarn build:e2e",
+    "e2e": "playwright test",
+    "e2e:server": "tsx --tsconfig e2e/tsconfig.json e2e/setup/start-server.ts",
+    "clean": "touch ./dist && rm -r ./dist" 
   },
   "exports": {
     ".": {
@@ -36,15 +42,21 @@
     "./client": {
       "import": "./dist/client.js",
       "types": "./dist/client/index.d.ts"
+    },
+    "./worker": {
+      "import": "./dist/worker.js",
+      "types": "./dist/worker.d.ts"
     }
   },
   "packageManager": "yarn@1.22.22",
   "devDependencies": {
-    "@types/express": "^4.17.21",
+    "@playwright/test": "^1.49.0",
+    "@types/express": "^5.0.0",
     "@types/jsdom": "^21.1.7",
     "@types/node": "^22.5.4",
-    "@types/ws": "^8.5.12",
+    "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.3.1",
+    "bun": "^1.1.38",
     "nodemon": "^3.1.4",
     "tsx": "^4.19.0",
     "typed-emitter": "^2.1.0",
@@ -54,7 +66,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "express": "^4.19.2",
+    "express": "^4.21.1",
     "jsdom": "^25.0.0",
     "vite": "^5.4.3",
     "web-worker": "^1.3.0",

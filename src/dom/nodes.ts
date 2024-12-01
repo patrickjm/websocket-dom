@@ -1,5 +1,4 @@
-import { getElementFromXPath } from "./events";
-import { getXPath, type WindowLike } from "../shared-utils";
+import { resolveXPath, getXPath, type WindowLike } from "../shared-utils";
 
 /** Reference to a node by XPath. */
 export interface XPathNodeRef {
@@ -51,7 +50,7 @@ export class NodeStash {
     if (id.type === 'stashed-id') {
       return this.stashed.get(id.id) ?? null;
     } else if (id.type === 'xpath') {
-      return getElementFromXPath(id.xpath, this.window.document) ?? null;
+      return resolveXPath(id.xpath, this.window.document) ?? null;
     }
     throw new Error('Unknown node ref type: ' + id);
   }

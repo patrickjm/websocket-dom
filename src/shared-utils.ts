@@ -2,6 +2,11 @@ import type { DOMWindow } from "jsdom";
 
 export type WindowLike = Window | DOMWindow;
 
+export function resolveXPath(xpath: XPath, document: Document): HTMLElement | null {
+  const FIRST_ORDERED_NODE_TYPE = 9;
+  return document.evaluate(xpath, document, null, FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
+}
+
 export function getXPath(node: Element | Text, window: WindowLike): XPath | null {
   // Node object not accessible on backend
   const TEXT_NODE = 3;
@@ -24,11 +29,14 @@ export function getXPath(node: Element | Text, window: WindowLike): XPath | null
   }
 
   const element = node as Element;
-  if (element.id !== '') {
-    return '//*[@id="' + element.id + '"]';
-  }
   if (element === window.document.body) {
     return '/html/body';
+  } else if (element === window.document.head) {
+    return '/html/head';
+  } else if (element === window.document.documentElement) {
+    return '/html';
+  } else if (element.id !== '') {
+    return '//*[@id="' + element.id + '"]';
   }
   let ix = 0;
   const siblings = element.parentNode?.childNodes;

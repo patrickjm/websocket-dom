@@ -1,20 +1,26 @@
-import type { SerializedEvent } from "./client/types";
-import type { Serialized } from "./dom/instructions";
+import type { SerializedEvent } from "./event";
+import type { SerializedMutation } from "./dom/mutations";
 
-export interface InstructionMessage {
-  type: 'instructions';
-  instructions: readonly Serialized[];
+export interface MutationMessage {
+  type: 'wsdom-mutation';
+  mutations: readonly SerializedMutation[];
 }
 
 export interface ErrorMessage {
-  type: 'error';
+  type: 'wsdom-err';
   error: string;
   errorInfo: string;
 }
 
 export interface EventMessage {
-  type: 'event';
+  type: 'wsdom-event';
   event: SerializedEvent;
 }
 
-export type Message = InstructionMessage | ErrorMessage | EventMessage;
+export interface ClientLogMessage {
+  type: 'wsdom-client-log';
+  jsonStrings: string[];
+  level: "log" | "debug" | "warn" | "error" | "trace";
+}
+
+export type Message = MutationMessage | ErrorMessage | EventMessage | ClientLogMessage;

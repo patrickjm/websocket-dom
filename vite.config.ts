@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import { copyFileSync } from 'fs'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -18,7 +19,8 @@ export default defineConfig({
     lib: {
       entry: {
         client: 'src/client/index.tsx',
-        worker: 'src/dom/worker.ts'
+        "worker-entrypoint": 'src/dom/worker-entrypoint.ts',
+        "worker": 'src/worker.ts'
       },
       formats: ['es'],
       fileName: (format, entryName) => `${entryName}.js`,
