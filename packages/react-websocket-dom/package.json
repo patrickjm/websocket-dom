@@ -1,0 +1,49 @@
+{
+  "name": "react-websocket-dom",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "README.md",
+    "dist",
+    "src",
+    "public",
+    "tsconfig.json"
+  ],
+  "scripts": {
+    "start": "vite build && tsx ./src/index.tsx",
+    "dev": "nodemon --watch src --watch vite.config.ts --watch index.html --watch public --ext ts,html,json,tsx --exec yarn start",
+    "build": "vite build && tsc"
+  },
+  "packageManager": "yarn@1.22.22",
+  "devDependencies": {
+    "@types/node": "^22.5.4",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@types/ws": "^8.5.12",
+    "nodemon": "^3.1.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsx": "^4.19.0",
+    "typed-emitter": "^2.1.0",
+    "typescript": "^5.0.0",
+    "websocket-dom": "^0.3.0"
+  },
+  "peerDependencies": {
+    "react": "^18",
+    "react-dom": "^18",
+    "typescript": "^5.0.0",
+    "websocket-dom": "^0.3.0"
+  },
+  "dependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.0.1",
+    "express": "^4.19.2",
+    "react-reconciler": "^0.29.2",
+    "vite": "^5.4.3",
+    "ws": "^8.18.0"
+  },
+  "license": "MIT"
+}

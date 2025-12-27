@@ -26,14 +26,14 @@
         // Node.js internal core modules
         "<node_internals>/**",
         // Ignore all dependencies (optional)
-        "${workspaceFolder}/node_modules/**",
-      ],
+        "${workspaceFolder}/node_modules/**"
+      ]
     },
     {
       "name": "tsx",
       "type": "node",
       "request": "launch",
-      "program": "${workspaceFolder}/src/index.tsx",
+      "program": "${workspaceFolder}/packages/websocket-dom/src/index.tsx",
       /*
        * Path to tsx binary
        * Assuming locally installed
@@ -50,8 +50,8 @@
         // Node.js internal core modules
         "<node_internals>/**",
         // Ignore all dependencies (optional)
-        "${workspaceFolder}/node_modules/**",
-      ],
+        "${workspaceFolder}/node_modules/**"
+      ]
     }
   ]
 }

@@ -5,19 +5,29 @@
     "node_modules": true,
     "playwright-report": true,
     "test-results": true,
-    "e2e/dist": true
+    "e2e/dist": true,
+    "packages/*/dist": true,
+    "packages/*/playwright-report": true,
+    "packages/*/test-results": true,
+    "packages/*/e2e/dist": true
   },
   "files.exclude": {
     "dist": false,
     "node_modules": true,
     "playwright-report": true,
-    "test-results": true
+    "test-results": true,
+    "packages/*/playwright-report": true,
+    "packages/*/test-results": true
   },
   "files.watcherExclude": {
     "dist/**": true,
     "node_modules/**": true,
     "playwright-report/**": true,
     "test-results/**": true,
-    "e2e/dist/**": true
+    "e2e/dist/**": true,
+    "packages/*/dist/**": true,
+    "packages/*/playwright-report/**": true,
+    "packages/*/test-results/**": true,
+    "packages/*/e2e/dist/**": true
   }
 }
