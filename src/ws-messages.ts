@@ -17,4 +17,17 @@ export interface EventMessage {
   event: SerializedEvent;
 }
 
-export type Message = InstructionMessage | ErrorMessage | EventMessage;
+export interface ReadyMessage {
+  type: 'ready';
+}
+
+export interface SnapshotMessage {
+  type: 'snapshot';
+  htmlAttributes: [string, string][];
+  headAttributes: [string, string][];
+  bodyAttributes: [string, string][];
+  headHtml: string;
+  bodyHtml: string;
+}
+
+export type Message = InstructionMessage | ErrorMessage | EventMessage | ReadyMessage | SnapshotMessage;

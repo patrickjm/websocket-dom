@@ -12,10 +12,35 @@ export function createClient(url: string) {
   const ws = new WebSocket(url);
   const nodes = new NodeStash(window);
   console.log('nodes', nodes);
+  let readyInterval: number | null = null;
+  const state = {
+    snapshotApplied: false,
+    lastMessageType: '',
+  };
 
   ws.onmessage = (event: MessageEvent) => {
     const data = JSON.parse(event.data) as Message;
-    if (data.type === 'instructions') {
+    state.lastMessageType = data.type;
+    if (data.type === 'snapshot') {
+      state.snapshotApplied = true;
+      const applyAttributes = (element: Element | null, attributes: [string, string][]) => {
+        if (!element) {
+          return;
+        }
+        attributes.forEach(([name, value]) => {
+          element.setAttribute(name, value);
+        });
+      };
+      applyAttributes(document.documentElement, data.htmlAttributes);
+      applyAttributes(document.head, data.headAttributes);
+      applyAttributes(document.body, data.bodyAttributes);
+      if (document.head) {
+        document.head.innerHTML = data.headHtml;
+      }
+      if (document.body) {
+        document.body.innerHTML = data.bodyHtml;
+      }
+    } else if (data.type === 'instructions') {
       for (const instruction of data.instructions) {
         const [type] = instruction;
         switch (type) {
@@ -74,15 +99,40 @@ export function createClient(url: string) {
     }
   };
 
-  ws.onopen = () => {
-    console.log('Connection opened');
+  const sendReady = () => {
+    ws.send(JSON.stringify({ type: 'ready' }));
   };
+
+  ws.addEventListener('open', () => {
+    sendReady();
+    if (readyInterval === null) {
+      readyInterval = window.setInterval(() => {
+        if (state.snapshotApplied) {
+          if (readyInterval !== null) {
+            clearInterval(readyInterval);
+            readyInterval = null;
+          }
+          return;
+        }
+        sendReady();
+      }, 250);
+    }
+    console.log('Connection opened');
+  });
+
+  if (ws.readyState === WebSocket.OPEN) {
+    sendReady();
+  }
 
   ws.onerror = (error) => {
     console.error('WebSocket error:', error);
   };
 
   ws.onclose = () => {
+    if (readyInterval !== null) {
+      clearInterval(readyInterval);
+      readyInterval = null;
+    }
     console.log('Connection closed');
   };
 
@@ -170,6 +220,7 @@ export function createClient(url: string) {
   }, true);
 
   return {
-    ws
+    ws,
+    state
   }
 }

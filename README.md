@@ -8,6 +8,8 @@ Fully control the client document and respond to user events from the backend.
 
 **Compatibility**: NodeJS v22+ with ESM.
 
+Security notice: there is not yet a comprehensive strategy to prevent untrusted code from executing on the client. Treat any synced content as trusted until a hardened policy exists.
+
 ## Usage
 
 Installation:

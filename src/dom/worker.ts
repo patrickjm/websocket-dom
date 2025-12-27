@@ -49,23 +49,11 @@ function initDom(doc: string, url: string) {
   });
 }
 
-function sendBodyInnerHTML() {
-  _postMessage({
-    type: "instruction",
-    instruction: SetProperty.serialize({
-      ref: { type: 'xpath', xpath: '/html/body' },
-      name: 'innerHTML',
-      value: dom.window.document.body.innerHTML,
-    })
-  } as MessageFromWorker);
-}
-
 
 addEventListener("message", (event: MessageEvent<MessageToWorker>) => {
   if (event.data.type === "init-dom") {
     const { doc, url } = event.data;
     initDom(doc, url);
-    sendBodyInnerHTML();
   } else if (event.data.type === "client-event") {
     dispatchEvent(nodes, emitter, dom.window, event.data.event);
   } else if (event.data.type === "dom-import") {

@@ -20,7 +20,7 @@ export class TestServer {
     this.port = 3333;
 
     this.wss.on('connection', (ws) => {
-      const doc = '<!DOCTYPE html><html><body></body></html>';
+      const doc = '<!DOCTYPE html><html lang="en" data-app="wsdom"><head><meta charset="utf-8"><title>Initial Title</title><script id="init-script">window.__initScript = true;</script></head><body data-state="initial"></body></html>';
       const { domImport, terminate } = createWebsocketDom(ws, doc, `http://localhost:${this.port}`);
 
       ws.on('message', (data) => {
