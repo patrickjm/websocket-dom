@@ -183,6 +183,9 @@ e2e/dist
 .yarn/install-state.gz
 .pnp.*
 
+# turbo
+.turbo
+
 # IntelliJ based IDEs
 .idea
 
