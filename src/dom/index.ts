@@ -1,13 +1,17 @@
 import { EventEmitter } from "events";
-import Worker from "web-worker";
+import { createRequire } from "module";
 import type { SerializedEvent } from "../client/types";
 import { type DomEmitter } from "./instructions";
 import { type MessageFromWorker, type MessageToWorker } from "./utils";
 import { randomUUID } from "crypto";
 
+const require = createRequire(import.meta.url);
+const WebWorker = require("web-worker");
+const WorkerCtor: typeof WebWorker = WebWorker.default ?? WebWorker;
+
 export function createDom(doc: string, { url }: { url: string }) {
   const emitter = new EventEmitter() as DomEmitter;
-  const worker = new Worker(new URL("./worker.js", import.meta.url).toString());
+  const worker = new WorkerCtor(new URL("./worker.js", import.meta.url).toString());
 
   worker.postMessage({ type: "init-dom", doc, url } as MessageToWorker);
 
@@ -15,7 +19,7 @@ export function createDom(doc: string, { url }: { url: string }) {
     worker.postMessage({ type: "client-event", event } as MessageToWorker);
   }
 
-  worker.onmessage = (_event) => {
+  worker.onmessage = (_event: MessageEvent) => {
     const event = _event.data as MessageFromWorker;
     if (event.type === "instruction") {
       emitter.emit("instruction", event.instruction);

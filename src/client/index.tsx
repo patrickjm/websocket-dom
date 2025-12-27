@@ -77,24 +77,81 @@ export function createClient(url: string) {
     console.log('Connection closed');
   };
 
-  function sendEvent(event: Event): void {
+  function sendEvent(event: Event, overrideType?: string): void {
     const serializedEvent = serializeEvent(event);
+    const payload = overrideType
+      ? { ...serializedEvent, type: overrideType }
+      : serializedEvent;
     ws.send(JSON.stringify({
       type: 'event',
-      event: serializedEvent
+      event: payload
     } as EventMessage));
   }
 
-  const eventTypes = ['click', 'keydown', 'keyup', 'input', 'change', 'submit', 'focus', 'blur', 'focusin', 'focusout'];
+  const eventTypes = [
+    'click',
+    'mousedown',
+    'mouseup',
+    'dblclick',
+    'contextmenu',
+    'keydown',
+    'keypress',
+    'keyup',
+    'input',
+    'change',
+    'submit',
+    'focus',
+    'blur',
+    'focusin',
+    'focusout',
+    'pointerdown',
+    'pointerup',
+    'pointermove',
+    'pointerenter',
+    'pointerleave',
+    'pointerover',
+    'pointerout',
+    'pointercancel',
+    'touchstart',
+    'touchmove',
+    'touchend',
+    'touchcancel',
+    'copy',
+    'cut',
+    'paste',
+    'compositionstart',
+    'compositionupdate',
+    'compositionend',
+    'beforeinput',
+    'selectionchange',
+    'reset',
+    'invalid',
+    'wheel',
+    'scroll'
+  ];
   eventTypes.forEach(eventType => {
     document.addEventListener(eventType, sendEvent, true);
   });
 
   const debouncedSendMouseEvent = debounce(sendEvent, 250);
-  const mouseEventTypes = ['mouseenter', 'mouseleave', 'mousemove', 'mouseout', 'mouseover'];
+  const mouseEventTypes = ['mouseover', 'mouseout', 'mousemove'];
   mouseEventTypes.forEach(eventType => {
-    document.addEventListener(eventType, debouncedSendMouseEvent, true);
+    const handler = eventType === 'mousemove' ? debouncedSendMouseEvent : sendEvent;
+    document.addEventListener(eventType, handler as EventListener, true);
   });
+  document.addEventListener('mouseover', (event) => {
+    sendEvent(event, 'mouseenter');
+  }, true);
+  document.addEventListener('mouseout', (event) => {
+    sendEvent(event, 'mouseleave');
+  }, true);
+
+  window.addEventListener('resize', (event) => {
+    sendEvent(event);
+  });
+  window.addEventListener('scroll', (event) => {
+    sendEvent(event);
+  }, true);
 
   return {
     ws

@@ -1,6 +1,7 @@
 import type { DOMWindow } from "jsdom";
 import { AppendChild, CloneNode, CreateDocumentFragment, CreateElement, CreateTextNode, InsertAdjacentElement, InsertAdjacentHTML, InsertAdjacentText, Normalize, PrependChild, RemoveChild, SetAttribute, SetProperty, type DomEmitter } from "./instructions";
 import { NodeStash } from "./nodes";
+import { isTargetSuppressed } from "./suppress";
 
 export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: DomEmitter) {
   
@@ -139,10 +140,16 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
         Object.defineProperty(prototype, prop, {
           ...descriptor,
           set(this: Element, value: any) {
-            console.log('element: set property', prop, value);
             originalSetter.call(this, value);
             const ref = nodes.findRefFor(this);
             if (ref && !prop.startsWith('on') && typeof value !== 'function') {
+              if (isTargetSuppressed(this)) {
+                const element = this as HTMLElement;
+                const isEditable = element.isContentEditable || element.getAttribute('contenteditable') !== null;
+                if (prop === 'value' || (prop === 'textContent' && isEditable)) {
+                  return;
+                }
+              }
               const serializedValue = typeof value === 'string' ? value : String(value);
               emitter.emit('instruction', SetProperty.serialize({ ref, name: prop, value: serializedValue }));
             }
@@ -157,10 +164,16 @@ export function extendPrototypes(window: DOMWindow, nodes: NodeStash, emitter: D
             return this[prefix + prop] || originalValue;
           },
           set(value: any) {
-            console.log('element: set property', prop, value);
             this[prefix + prop] = value;
             const ref = nodes.findRefFor(this);
             if (ref && !prop.startsWith('on') && typeof value !== 'function') {
+              if (isTargetSuppressed(this)) {
+                const element = this as HTMLElement;
+                const isEditable = element.isContentEditable || element.getAttribute('contenteditable') !== null;
+                if (prop === 'value' || (prop === 'textContent' && isEditable)) {
+                  return;
+                }
+              }
               const serializedValue = typeof value === 'string' ? value : String(value);
               emitter.emit('instruction', SetProperty.serialize({ ref, name: prop, value: serializedValue }));
             }

@@ -1,12 +1,23 @@
 {
   // Exclude the dist folder from Quick Open (Cmd+P) but keep it in the file tree
   "search.exclude": {
-    "dist": true
+    "dist": true,
+    "node_modules": true,
+    "playwright-report": true,
+    "test-results": true,
+    "e2e/dist": true
   },
   "files.exclude": {
-    "dist": false
+    "dist": false,
+    "node_modules": true,
+    "playwright-report": true,
+    "test-results": true
   },
   "files.watcherExclude": {
-    "dist/**": true
+    "dist/**": true,
+    "node_modules/**": true,
+    "playwright-report/**": true,
+    "test-results/**": true,
+    "e2e/dist/**": true
   }
 }

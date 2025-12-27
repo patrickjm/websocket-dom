@@ -18,6 +18,18 @@ export interface SerializedClickEvent extends BaseSerializedEvent {
   shiftKey: boolean;
 }
 
+export interface SerializedMouseButtonEvent extends BaseSerializedEvent {
+  type: 'mousedown' | 'mouseup' | 'dblclick' | 'contextmenu';
+  clientX: number;
+  clientY: number;
+  button: number;
+  buttons: number;
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}
+
 export interface SerializedKeyboardEvent extends BaseSerializedEvent {
   type: 'keydown' | 'keyup' | 'keypress';
   key: string;
@@ -35,7 +47,7 @@ export interface SerializedKeyboardEvent extends BaseSerializedEvent {
 }
 
 export interface SerializedFocusEvent extends BaseSerializedEvent {
-  type: 'focus' | 'blur';
+  type: 'focus' | 'blur' | 'focusin' | 'focusout';
 }
 
 export interface SerializedInputEvent extends BaseSerializedEvent {
@@ -64,6 +76,48 @@ export interface SerializedMouseEvent extends BaseSerializedEvent {
   shiftKey: boolean;
 }
 
+export interface SerializedWheelEvent extends BaseSerializedEvent {
+  type: 'wheel';
+  deltaX: number;
+  deltaY: number;
+  deltaZ: number;
+  deltaMode: number;
+  clientX: number;
+  clientY: number;
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}
+
+export interface SerializedSimpleEvent extends BaseSerializedEvent {
+  type:
+    | 'pointerdown'
+    | 'pointerup'
+    | 'pointermove'
+    | 'pointerenter'
+    | 'pointerleave'
+    | 'pointerover'
+    | 'pointerout'
+    | 'pointercancel'
+    | 'touchstart'
+    | 'touchmove'
+    | 'touchend'
+    | 'touchcancel'
+    | 'copy'
+    | 'cut'
+    | 'paste'
+    | 'compositionstart'
+    | 'compositionupdate'
+    | 'compositionend'
+    | 'beforeinput'
+    | 'selectionchange'
+    | 'scroll'
+    | 'resize'
+    | 'reset'
+    | 'invalid';
+}
+
 export interface SerializedChangeEvent extends BaseSerializedEvent {
   type: 'change';
   value: string;
@@ -71,9 +125,12 @@ export interface SerializedChangeEvent extends BaseSerializedEvent {
 
 export type SerializedEvent =
   | SerializedClickEvent
+  | SerializedMouseButtonEvent
   | SerializedKeyboardEvent
   | SerializedFocusEvent
   | SerializedInputEvent
   | SerializedSubmitEvent
   | SerializedMouseEvent
+  | SerializedWheelEvent
+  | SerializedSimpleEvent
   | SerializedChangeEvent;
