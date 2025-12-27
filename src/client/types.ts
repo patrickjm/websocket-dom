@@ -76,6 +76,20 @@ export interface SerializedMouseEvent extends BaseSerializedEvent {
   shiftKey: boolean;
 }
 
+export interface SerializedDragEvent extends BaseSerializedEvent {
+  type: 'dragstart' | 'drag' | 'dragend' | 'dragenter' | 'dragover' | 'dragleave' | 'drop';
+  clientX: number;
+  clientY: number;
+  pageX: number;
+  pageY: number;
+  screenX: number;
+  screenY: number;
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}
+
 export interface SerializedWheelEvent extends BaseSerializedEvent {
   type: 'wheel';
   deltaX: number;
@@ -131,6 +145,7 @@ export type SerializedEvent =
   | SerializedInputEvent
   | SerializedSubmitEvent
   | SerializedMouseEvent
+  | SerializedDragEvent
   | SerializedWheelEvent
   | SerializedSimpleEvent
   | SerializedChangeEvent;

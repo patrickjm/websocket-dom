@@ -75,6 +75,17 @@ const mouseEvents = [
 ];
 mouseEvents.forEach((type) => mouseArea.addEventListener(type, record));
 
+const dragEvents = [
+  'dragstart',
+  'drag',
+  'dragend',
+  'dragenter',
+  'dragover',
+  'dragleave',
+  'drop',
+];
+dragEvents.forEach((type) => mouseArea.addEventListener(type, record));
+
 const pointerEvents = [
   'pointerdown',
   'pointerup',
@@ -177,6 +188,25 @@ test('should dispatch supported event types', async ({ page }) => {
   await expect(page.locator('#events')).toHaveAttribute('data-events', /(^|,)dblclick(,|$)/);
   await expect(page.locator('#events')).toHaveAttribute('data-events', /(^|,)contextmenu(,|$)/);
   await expect(page.locator('#events')).toHaveAttribute('data-events', /(^|,)wheel(,|$)/);
+
+  await page.evaluate(() => {
+    const area = document.querySelector('#mouse-area') as HTMLElement;
+    const dragEvents = ['dragstart', 'drag', 'dragenter', 'dragover', 'dragleave', 'drop', 'dragend'];
+    dragEvents.forEach((type) => {
+      if (typeof (window as any).DragEvent === 'function') {
+        area.dispatchEvent(new (window as any).DragEvent(type, { bubbles: true, cancelable: true }));
+      } else {
+        area.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }));
+      }
+    });
+  });
+  await expect(page.locator('#events')).toHaveAttribute('data-events', /(^|,)dragstart(,|$)/);
+  await expect(page.locator('#events')).toHaveAttribute('data-events', /(^|,)drag(,|$)/);
+  await expect(page.locator('#events')).toHaveAttribute('data-events', /(^|,)dragenter(,|$)/);
+  await expect(page.locator('#events')).toHaveAttribute('data-events', /(^|,)dragover(,|$)/);
+  await expect(page.locator('#events')).toHaveAttribute('data-events', /(^|,)dragleave(,|$)/);
+  await expect(page.locator('#events')).toHaveAttribute('data-events', /(^|,)drop(,|$)/);
+  await expect(page.locator('#events')).toHaveAttribute('data-events', /(^|,)dragend(,|$)/);
 
   await page.evaluate(() => {
     const area = document.querySelector('#mouse-area') as HTMLElement;

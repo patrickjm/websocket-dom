@@ -29,6 +29,7 @@ export class NodeStash {
   private window: WindowLike;
   private nextId = 0;
   private stashed: Map<number, StashedNode> = new Map();
+  private idByNode: WeakMap<StashedNode, number> = new WeakMap();
   private lastStashedId = 0;
 
   constructor(window: WindowLike) {
@@ -36,8 +37,14 @@ export class NodeStash {
   }
 
   public stash(node: StashedNode, id?: number): StashedIdNodeRef {
+    const existing = this.idByNode.get(node);
+    if (existing !== undefined) {
+      this.lastStashedId = existing;
+      return { type: 'stashed-id', id: existing };
+    }
     const _id = id ?? this.nextId;
     this.stashed.set(_id, node);
+    this.idByNode.set(node, _id);
     this.nextId = _id + 1;
     this.lastStashedId = _id;
     return { type: 'stashed-id', id: _id };
@@ -56,15 +63,10 @@ export class NodeStash {
     throw new Error('Unknown node ref type: ' + id);
   }
 
-  public unstash(id: StashedIdNodeRef): void {
-    this.stashed.delete(id.id);
-  }
-
   public findRefFor(node: StashedNode): NodeRef | null {
-    for (const [id, stashed] of this.stashed.entries()) {
-      if (stashed === node || stashed.isSameNode(node)) {
-        return { type: 'stashed-id', id };
-      }
+    const existing = this.idByNode.get(node);
+    if (existing !== undefined) {
+      return { type: 'stashed-id', id: existing };
     }
     const xpath = getXPath(node as Element, this.window);
     if (xpath) {

@@ -31,6 +31,9 @@ export enum InstructionType {
   InsertAdjacentText = "insertAdjacentText",
   PrependChild = "prependChild",
   Normalize = "normalize",
+  InsertBefore = "insertBefore",
+  ReplaceChild = "replaceChild",
+  RemoveAttribute = "removeAttribute",
 }
 
 export namespace CreateElement {
@@ -147,7 +150,6 @@ export namespace AppendChild {
     const child = nodes.get(childRef);
     if (parent && child) {
       parent.appendChild(child);
-      nodes.unstash(childRef);
     }
   }
 }
@@ -332,9 +334,6 @@ export namespace PrependChild {
     } else {
       const childRef = { type: 'stashed-id', id: data.child } as StashedIdNodeRef;
       child = nodes.get(childRef) as Node;
-      if (child) {
-        nodes.unstash(childRef);
-      }
     }
     if (parent && child) {
       parent.prepend(child);
@@ -360,6 +359,88 @@ export namespace Normalize {
     const node = nodes.get(data.ref);
     if (node) {
       node.normalize();
+    }
+  }
+}
+
+export namespace InsertBefore {
+  export type Data = {
+    parent: NodeRef;
+    child: StashedIdNodeRef['id'];
+    referenceChild: NodeRef | null;
+  }
+  export type Serialized = [InstructionType.InsertBefore, NodeRef, StashedIdNodeRef['id'], NodeRef | null]
+  export function serialize(data: Data): Serialized {
+    return [InstructionType.InsertBefore, data.parent, data.child, data.referenceChild] as const;
+  }
+  export function deserialize(data: Serialized): Data {
+    return {
+      parent: data[1],
+      child: data[2],
+      referenceChild: data[3],
+    }
+  }
+  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('insert before', data);
+    const parent = nodes.get(data.parent);
+    const childRef = { type: "stashed-id", id: data.child } as StashedIdNodeRef;
+    const child = nodes.get(childRef);
+    const reference = data.referenceChild ? nodes.get(data.referenceChild) : null;
+    if (parent && child) {
+      parent.insertBefore(child, reference || null);
+    }
+  }
+}
+
+export namespace ReplaceChild {
+  export type Data = {
+    parent: NodeRef;
+    newChild: StashedIdNodeRef['id'];
+    oldChild: NodeRef;
+  }
+  export type Serialized = [InstructionType.ReplaceChild, NodeRef, StashedIdNodeRef['id'], NodeRef]
+  export function serialize(data: Data): Serialized {
+    return [InstructionType.ReplaceChild, data.parent, data.newChild, data.oldChild] as const;
+  }
+  export function deserialize(data: Serialized): Data {
+    return {
+      parent: data[1],
+      newChild: data[2],
+      oldChild: data[3],
+    }
+  }
+  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('replace child', data);
+    const parent = nodes.get(data.parent);
+    const newChildRef = { type: "stashed-id", id: data.newChild } as StashedIdNodeRef;
+    const newChild = nodes.get(newChildRef);
+    const oldChild = nodes.get(data.oldChild);
+    if (parent && newChild && oldChild) {
+      parent.replaceChild(newChild, oldChild);
+    }
+  }
+}
+
+export namespace RemoveAttribute {
+  export type Data = {
+    ref: NodeRef;
+    name: string;
+  }
+  export type Serialized = [InstructionType.RemoveAttribute, NodeRef, string]
+  export function serialize(data: Data): Serialized {
+    return [InstructionType.RemoveAttribute, data.ref, data.name] as const;
+  }
+  export function deserialize(data: Serialized): Data {
+    return {
+      ref: data[1],
+      name: data[2],
+    }
+  }
+  export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
+    console.log('remove attribute', data);
+    const element = nodes.get(data.ref);
+    if (element && element instanceof Element) {
+      element.removeAttribute(data.name);
     }
   }
 }

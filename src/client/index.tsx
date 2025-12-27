@@ -58,6 +58,15 @@ export function createClient(url: string) {
           case Instr.InstructionType.Normalize:
             Instr.Normalize.apply({ window, nodes }, Instr.Normalize.deserialize(instruction as Instr.Normalize.Serialized));
             break;
+          case Instr.InstructionType.InsertBefore:
+            Instr.InsertBefore.apply({ window, nodes }, Instr.InsertBefore.deserialize(instruction as Instr.InsertBefore.Serialized));
+            break;
+          case Instr.InstructionType.ReplaceChild:
+            Instr.ReplaceChild.apply({ window, nodes }, Instr.ReplaceChild.deserialize(instruction as Instr.ReplaceChild.Serialized));
+            break;
+          case Instr.InstructionType.RemoveAttribute:
+            Instr.RemoveAttribute.apply({ window, nodes }, Instr.RemoveAttribute.deserialize(instruction as Instr.RemoveAttribute.Serialized));
+            break;
         }
       }
     } else if (data.type === 'error') {
@@ -104,6 +113,13 @@ export function createClient(url: string) {
     'blur',
     'focusin',
     'focusout',
+    'dragstart',
+    'drag',
+    'dragend',
+    'dragenter',
+    'dragover',
+    'dragleave',
+    'drop',
     'pointerdown',
     'pointerup',
     'pointermove',

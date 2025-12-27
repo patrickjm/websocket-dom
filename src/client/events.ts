@@ -13,6 +13,13 @@ export function serializeEvent(event: Event): SerializedEvent {
     'compositionstart',
     'compositionupdate',
     'compositionend',
+    'dragstart',
+    'drag',
+    'dragend',
+    'dragenter',
+    'dragover',
+    'dragleave',
+    'drop',
   ]);
   if (!event.type.startsWith('key') && !allowDefaultTypes.has(event.type)) {
     event.stopPropagation();
@@ -89,6 +96,14 @@ export function serializeEvent(event: Event): SerializedEvent {
     case 'mouseout':
     case 'mouseover':
       return serializeMouseEvent(event as MouseEvent, baseEvent);
+    case 'dragstart':
+    case 'drag':
+    case 'dragend':
+    case 'dragenter':
+    case 'dragover':
+    case 'dragleave':
+    case 'drop':
+      return serializeDragEvent(event as MouseEvent, baseEvent);
     case 'change':
       return serializeChangeEvent(event, baseEvent);
     default:
@@ -184,6 +199,23 @@ function serializeMouseEvent(event: MouseEvent, baseEvent: BaseSerializedEvent):
   return {
     ...baseEvent,
     type: event.type as 'mouseenter' | 'mouseleave' | 'mousemove' | 'mouseout' | 'mouseover',
+    clientX: event.clientX,
+    clientY: event.clientY,
+    pageX: event.pageX,
+    pageY: event.pageY,
+    screenX: event.screenX,
+    screenY: event.screenY,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    shiftKey: event.shiftKey,
+  };
+}
+
+function serializeDragEvent(event: MouseEvent, baseEvent: BaseSerializedEvent): SerializedEvent {
+  return {
+    ...baseEvent,
+    type: event.type as 'dragstart' | 'drag' | 'dragend' | 'dragenter' | 'dragover' | 'dragleave' | 'drop',
     clientX: event.clientX,
     clientY: event.clientY,
     pageX: event.pageX,

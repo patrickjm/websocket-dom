@@ -1,5 +1,5 @@
 import type { DOMWindow } from 'jsdom';
-import { type SerializedChangeEvent, type SerializedClickEvent, type SerializedEvent, type SerializedFocusEvent, type SerializedInputEvent, type SerializedKeyboardEvent, type SerializedMouseButtonEvent, type SerializedMouseEvent, type SerializedSubmitEvent, type SerializedWheelEvent } from '../client/types';
+import { type SerializedChangeEvent, type SerializedClickEvent, type SerializedDragEvent, type SerializedEvent, type SerializedFocusEvent, type SerializedInputEvent, type SerializedKeyboardEvent, type SerializedMouseButtonEvent, type SerializedMouseEvent, type SerializedSubmitEvent, type SerializedWheelEvent } from '../client/types';
 import { type XPath } from "../shared-utils";
 import type { NodeStash } from './nodes';
 import type { DomEmitter } from './instructions';
@@ -89,6 +89,14 @@ function deserializeEvent(window: DOMWindow, event: SerializedEvent): [DispatchT
     case 'mouseout':
     case 'mouseover':
       return [targetElement ?? fallbackTarget, deserializeMouseEvent(event, window)];
+    case 'dragstart':
+    case 'drag':
+    case 'dragend':
+    case 'dragenter':
+    case 'dragover':
+    case 'dragleave':
+    case 'drop':
+      return [targetElement ?? fallbackTarget, deserializeDragEvent(event, window)];
     default:
       console.warn(`Unhandled event type: ${(event as SerializedEvent).type}`);
       return [targetElement ?? fallbackTarget, deserializeDefaultEvent(event, window)];
@@ -203,6 +211,37 @@ function deserializeMouseEvent(event: SerializedMouseEvent, window: DOMWindow): 
     button: 0,
     buttons: 1,
     relatedTarget: null,
+  });
+}
+
+function deserializeDragEvent(event: SerializedDragEvent, window: DOMWindow): Event {
+  if (typeof (window as any).DragEvent === 'function') {
+    return new (window as any).DragEvent(event.type, {
+      bubbles: true,
+      cancelable: true,
+      view: window as any,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      screenX: event.screenX,
+      screenY: event.screenY,
+      altKey: event.altKey,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      shiftKey: event.shiftKey,
+    });
+  }
+  return new window.MouseEvent(event.type, {
+    bubbles: true,
+    cancelable: true,
+    view: window as any,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    screenX: event.screenX,
+    screenY: event.screenY,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    shiftKey: event.shiftKey,
   });
 }
 
