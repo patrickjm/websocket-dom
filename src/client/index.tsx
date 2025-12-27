@@ -147,6 +147,10 @@ export function createClient(url: string) {
     } as EventMessage));
   }
 
+  function resync(): void {
+    ws.send(JSON.stringify({ type: 'resync' }));
+  }
+
   const eventTypes = [
     'click',
     'mousedown',
@@ -221,6 +225,7 @@ export function createClient(url: string) {
 
   return {
     ws,
-    state
+    state,
+    resync
   }
 }

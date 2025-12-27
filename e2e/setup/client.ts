@@ -1,6 +1,7 @@
 import { createClient } from "../../src/client";
 
-const { ws } = createClient('ws://localhost:3333');
+const client = createClient('ws://localhost:3333');
+const { ws } = client;
 
 ws.onopen = () => {
   console.log('Connection opened');
@@ -15,3 +16,4 @@ ws.onclose = () => {
 };
 
 (window as any).ws = ws;
+(window as any).wsdomClient = client;

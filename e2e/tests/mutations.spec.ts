@@ -91,6 +91,11 @@ document.body.appendChild(htmlContainer);
 htmlContainer.insertAdjacentHTML('beforeend', '<script id=\"html-script\">document.body.dataset.htmlScriptRan = \"yes\";</script><div id=\"html-safe\">safe</div>');
 `;
 
+const resyncScript = `
+document.title = 'Server Title';
+document.body.setAttribute('data-state', 'server');
+`;
+
 test('should sync insertBefore/replaceChild/removeAttribute/classList/style mutations', async ({ page }) => {
   await page.goto('/');
   await importScript(page, mutationScript);
@@ -130,6 +135,23 @@ test('should sync initial head/body/html state without scripts', async ({ page }
   await expect(page.locator('body')).toHaveAttribute('data-state', 'initial');
   await expect(page.locator('meta[charset=\"utf-8\"]')).toHaveCount(1);
   await expect(page.locator('#init-script')).toHaveCount(0);
+});
+
+test('should resync snapshot on demand', async ({ page }) => {
+  await page.goto('/');
+  await importScript(page, resyncScript);
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'server');
+
+  await page.evaluate(() => {
+    document.title = 'Client Title';
+    document.body.setAttribute('data-state', 'client');
+    const ws = (window as any).ws as WebSocket;
+    ws.send(JSON.stringify({ type: 'resync' }));
+  });
+
+  await page.waitForFunction(() => document.title === 'Server Title');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'server');
 });
 
 test('should preserve node identity across detach and reparent', async ({ page }) => {

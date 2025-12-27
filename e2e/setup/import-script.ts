@@ -16,6 +16,11 @@ export async function importScript(page: Page, code: string) {
   ].join('\n');
   await fs.promises.writeFile(testWorkerPath, writeCode, { flag: 'w' });
 
+  await page.waitForFunction(() => {
+    const client = (window as any).wsdomClient;
+    return !!client && client.state && client.state.snapshotApplied === true;
+  });
+
   await page.evaluate(async ({ testWorkerPath }) => {
     const ws = (window as any).ws as WebSocket;
     if (ws.readyState !== WebSocket.OPEN) {

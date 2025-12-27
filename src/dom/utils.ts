@@ -1,10 +1,14 @@
 import type { SerializedEvent } from "client/types";
+import type { SnapshotMessage } from "../ws-messages";
 import type { Serialized } from "./instructions";
 
 export type MessageToWorker = {
   type: "init-dom";
   doc: string;
   url: string;
+} | {
+  type: "snapshot-request";
+  id: string;
 } | {
   type: "client-event";
   event: SerializedEvent;
@@ -20,6 +24,10 @@ export type MessageToWorker = {
 export type MessageFromWorker = {
   type: "instruction";
   instruction: Serialized;
+} | {
+  type: "snapshot";
+  id: string;
+  snapshot: SnapshotMessage;
 } | {
   type: "eval-result";
   jsonString: string;

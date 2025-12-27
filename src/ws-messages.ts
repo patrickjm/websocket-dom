@@ -21,6 +21,10 @@ export interface ReadyMessage {
   type: 'ready';
 }
 
+export interface ResyncMessage {
+  type: 'resync';
+}
+
 export interface SnapshotMessage {
   type: 'snapshot';
   htmlAttributes: [string, string][];
@@ -30,4 +34,4 @@ export interface SnapshotMessage {
   bodyHtml: string;
 }
 
-export type Message = InstructionMessage | ErrorMessage | EventMessage | ReadyMessage | SnapshotMessage;
+export type Message = InstructionMessage | ErrorMessage | EventMessage | ReadyMessage | ResyncMessage | SnapshotMessage;

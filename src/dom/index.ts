@@ -4,6 +4,7 @@ import type { SerializedEvent } from "../client/types";
 import { type DomEmitter } from "./instructions";
 import { type MessageFromWorker, type MessageToWorker } from "./utils";
 import { randomUUID } from "crypto";
+import type { SnapshotMessage } from "../ws-messages";
 
 const require = createRequire(import.meta.url);
 const WebWorker = require("web-worker");
@@ -12,6 +13,7 @@ const WorkerCtor: typeof WebWorker = WebWorker.default ?? WebWorker;
 export function createDom(doc: string, { url }: { url: string }) {
   const emitter = new EventEmitter() as DomEmitter;
   const worker = new WorkerCtor(new URL("./worker.js", import.meta.url).toString());
+  const snapshotResolvers = new Map<string, (snapshot: SnapshotMessage) => void>();
 
   worker.postMessage({ type: "init-dom", doc, url } as MessageToWorker);
 
@@ -23,6 +25,12 @@ export function createDom(doc: string, { url }: { url: string }) {
     const event = _event.data as MessageFromWorker;
     if (event.type === "instruction") {
       emitter.emit("instruction", event.instruction);
+    } else if (event.type === "snapshot") {
+      const resolve = snapshotResolvers.get(event.id);
+      if (resolve) {
+        snapshotResolvers.delete(event.id);
+        resolve(event.snapshot);
+      }
     } else if (event.type === "eval-result") {
       emitter.emit("evalResult", { id: event.id, jsonString: event.jsonString });
     }
@@ -50,12 +58,21 @@ export function createDom(doc: string, { url }: { url: string }) {
     });
   }
 
+  function getSnapshot(): Promise<SnapshotMessage> {
+    const id = randomUUID();
+    worker.postMessage({ type: "snapshot-request", id } as MessageToWorker);
+    return new Promise((resolve) => {
+      snapshotResolvers.set(id, resolve);
+    });
+  }
+
   return {
     emitter,
     dispatchEvent,
     domImport,
     terminate,
     evalString,
+    getSnapshot,
     worker
   }
 }

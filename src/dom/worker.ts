@@ -1,13 +1,16 @@
 import { JSDOM } from "jsdom";
 import { NodeStash } from "./nodes";
 import { extendPrototypes } from "./prototypes";
-import { SetProperty, type DomEmitter } from "./instructions";
+import { type DomEmitter } from "./instructions";
 import { EventEmitter } from "events";
 import { createBrowserStorage, type MessageFromWorker, type MessageToWorker } from "./utils";
 import { dispatchEvent } from "./events";
+import { sanitizeElement, shouldSkipAttribute } from "./sanitize";
+import type { SnapshotMessage } from "../ws-messages";
 
 let nodes: NodeStash;
 let dom: JSDOM;
+const pendingSnapshotRequests: string[] = [];
 const emitter = new EventEmitter() as DomEmitter;
 const _postMessage: (msg: MessageFromWorker) => void = globalThis.postMessage;
 
@@ -47,13 +50,48 @@ function initDom(doc: string, url: string) {
   emitter.on("instruction", (instruction) => {
     _postMessage({ type: "instruction", instruction } as MessageFromWorker);
   });
+  while (pendingSnapshotRequests.length > 0) {
+    const id = pendingSnapshotRequests.shift()!;
+    _postMessage({ type: "snapshot", id, snapshot: buildSnapshot() } as MessageFromWorker);
+  }
 }
 
+function collectAttributes(element: Element | null): [string, string][] {
+  if (!element) {
+    return [];
+  }
+  const attrs: [string, string][] = [];
+  Array.from(element.attributes).forEach((attr) => {
+    if (shouldSkipAttribute(attr.name, attr.value)) {
+      return;
+    }
+    attrs.push([attr.name, attr.value]);
+  });
+  return attrs;
+}
+
+function buildSnapshot(): SnapshotMessage {
+  const { document } = dom.window;
+  return {
+    type: "snapshot",
+    htmlAttributes: collectAttributes(document.documentElement),
+    headAttributes: collectAttributes(document.head),
+    bodyAttributes: collectAttributes(document.body),
+    headHtml: document.head ? sanitizeElement(document.head).innerHTML : "",
+    bodyHtml: document.body ? sanitizeElement(document.body).innerHTML : "",
+  };
+}
 
 addEventListener("message", (event: MessageEvent<MessageToWorker>) => {
   if (event.data.type === "init-dom") {
     const { doc, url } = event.data;
     initDom(doc, url);
+  } else if (event.data.type === "snapshot-request") {
+    if (!dom) {
+      pendingSnapshotRequests.push(event.data.id);
+      return;
+    }
+    _postMessage({ type: "snapshot", id: event.data.id, snapshot: buildSnapshot() } as MessageFromWorker);
   } else if (event.data.type === "client-event") {
     dispatchEvent(nodes, emitter, dom.window, event.data.event);
   } else if (event.data.type === "dom-import") {
