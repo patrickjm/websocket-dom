@@ -9,7 +9,7 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "e2e": "turbo run e2e --output-logs=errors-only --log-prefix=none --log-order=grouped",
+    "e2e": "turbo run e2e --output-logs=full --log-prefix=none --log-order=grouped",
     "changeset": "changeset"
   },
   "devDependencies": {

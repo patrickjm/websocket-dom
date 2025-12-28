@@ -11,7 +11,8 @@
     "lint": {},
     "e2e": {
       "dependsOn": ["build"],
-      "outputs": ["playwright-report/**", "test-results/**"]
+      "outputs": ["playwright-report/**", "test-results/**"],
+      "cache": false
     }
   }
 }
