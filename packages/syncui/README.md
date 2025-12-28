@@ -39,7 +39,7 @@ Then set up the server (assuming you're using Express):
 ```ts
 import { WebsocketDOM } from 'syncui';
 import { createWebSocketServerTransport } from 'syncui/transport-ws/server';
-import { createDom } from 'syncui-dom/adapter-server-jsdom';
+import { createJsdomAdapter } from 'syncui-dom/adapter-server-jsdom';
 import { JSDOM } from 'jsdom';
 import http from 'http';
 import express from 'express';
@@ -55,7 +55,7 @@ const doc = '<!DOCTYPE html><html><body></body></html>';
 const wsDom = new WebsocketDOM({
   htmlDocument: doc,
   url: 'http://localhost:3000',
-  adapter: (document, options) => createDom(document, options, { JSDOM }),
+  adapter: (document, options) => createJsdomAdapter(document, options, { JSDOM }),
 });
 
 wss.on('connection', (ws) => {

@@ -1,1 +1,1 @@
-export { createDom, type JsdomAdapterDeps } from "./adapter/dom";
+export { createJsdomAdapter, type JsdomAdapterDeps } from "./adapter/dom";

@@ -17,14 +17,14 @@ yarn add react-syncui-dom
 ```ts
 import { WebsocketDOM } from "syncui";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";
-import { createDom } from "syncui-dom/adapter-jsdom";
+import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
 import { JSDOM } from "jsdom";
 import { loadReactSyncUiDom } from "react-syncui-dom";
 
 const wsDom = new WebsocketDOM({
   htmlDocument: doc,
   url,
-  adapter: (document, options) => createDom(document, options, { JSDOM }),
+  adapter: (document, options) => createJsdomAdapter(document, options, { JSDOM }),
 });
 
 wsDom.addConnection(createWebSocketServerTransport(ws));

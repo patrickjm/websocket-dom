@@ -14,7 +14,7 @@ export type JsdomAdapterDeps = {
   JSDOM: typeof import("jsdom").JSDOM;
 };
 
-export function createDom(
+export function createJsdomAdapter(
   doc: string,
   { url }: { url: string },
   deps: JsdomAdapterDeps

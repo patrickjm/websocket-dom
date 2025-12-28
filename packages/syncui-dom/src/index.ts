@@ -1,8 +1,11 @@
 export {
-  createBrowserAdapter,
+  createClientDomAdapter,
   type BrowserAdapterOptions,
 } from "./adapter-client-dom";
-export { createDom, type JsdomAdapterDeps } from "./adapter-server-jsdom";
+export {
+  createJsdomAdapter,
+  type JsdomAdapterDeps,
+} from "./adapter-server-jsdom";
 export {
   createPlaywrightAdapter,
   type PlaywrightAdapterDeps,

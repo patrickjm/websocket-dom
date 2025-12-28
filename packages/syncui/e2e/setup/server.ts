@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
 import { WebsocketDOM } from "../../src";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";
-import { createDom } from "syncui-dom/adapter-server-jsdom";
+import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
 import { createPlaywrightAdapter } from "syncui-dom/adapter-server-playwright";
 import { JSDOM } from "jsdom";
 import { chromium, type Browser, type Page } from "@playwright/test";
@@ -75,7 +75,7 @@ export class TestServer {
           this.adapter === "playwright"
             ? await this.createPlaywrightAdapter(sessionId, url)
             : (document: string, options: { url: string }) =>
-                createDom(document, options, { JSDOM });
+                createJsdomAdapter(document, options, { JSDOM });
         const session = new WebsocketDOM({
           htmlDocument: this.baseDoc,
           url,

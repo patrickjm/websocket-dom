@@ -13,7 +13,7 @@ export type BrowserAdapterOptions = {
   window?: AdapterWindow;
 };
 
-export function createBrowserAdapter(
+export function createClientDomAdapter(
   options: BrowserAdapterOptions = {}
 ): UiAdapter {
   const defaultWindow =

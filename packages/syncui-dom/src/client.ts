@@ -1,5 +1,5 @@
 export { createClient } from "syncui/client";
 export {
-  createBrowserAdapter,
+  createClientDomAdapter,
   type BrowserAdapterOptions,
 } from "./adapter-client-dom";

@@ -7,17 +7,34 @@ Install:
 npm i syncui-dom
 ```
 
+## Client vs server adapters
+
+Client DOM:
+```ts
+import { createClientDomAdapter } from "syncui-dom/adapter-client-dom";
+```
+
+Server (JSDOM):
+```ts
+import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
+```
+
+Server (Playwright):
+```ts
+import { createPlaywrightAdapter } from "syncui-dom/adapter-server-playwright";
+```
+
 JSDOM adapter (server):
 ```ts
 import { WebsocketDOM } from "syncui";
-import { createDom } from "syncui-dom/adapter-server-jsdom";
+import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";
 import { JSDOM } from "jsdom";
 
 const wsDom = new WebsocketDOM({
   htmlDocument: "<!doctype html><html><body></body></html>",
   url: "http://localhost:3000",
-  adapter: (doc, options) => createDom(doc, options, { JSDOM }),
+  adapter: (doc, options) => createJsdomAdapter(doc, options, { JSDOM }),
 });
 
 wss.on("connection", (ws) => {
@@ -27,9 +44,9 @@ wss.on("connection", (ws) => {
 
 Browser adapter:
 ```ts
-import { createBrowserAdapter } from "syncui-dom/adapter-client-dom";
+import { createClientDomAdapter } from "syncui-dom/adapter-client-dom";
 
-const adapter = createBrowserAdapter();
+const adapter = createClientDomAdapter();
 ```
 
 Playwright adapter:
