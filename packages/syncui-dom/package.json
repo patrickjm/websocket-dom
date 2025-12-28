@@ -20,17 +20,17 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./adapter-dom": {
-      "import": "./dist/adapter-dom.js",
-      "types": "./dist/adapter-dom.d.ts"
+    "./adapter-client-dom": {
+      "import": "./dist/adapter-client-dom.js",
+      "types": "./dist/adapter-client-dom.d.ts"
     },
-    "./adapter-jsdom": {
-      "import": "./dist/adapter-jsdom.js",
-      "types": "./dist/adapter-jsdom.d.ts"
+    "./adapter-server-jsdom": {
+      "import": "./dist/adapter-server-jsdom.js",
+      "types": "./dist/adapter-server-jsdom.d.ts"
     },
-    "./adapter-playwright": {
-      "import": "./dist/adapter-playwright.js",
-      "types": "./dist/adapter-playwright.d.ts"
+    "./adapter-server-playwright": {
+      "import": "./dist/adapter-server-playwright.js",
+      "types": "./dist/adapter-server-playwright.d.ts"
     },
     "./client": {
       "import": "./dist/client.js",
@@ -50,9 +50,13 @@
     "jsdom": "^25.0.0",
     "@playwright/test": "^1.49.0"
   },
-  "optionalDependencies": {
-    "jsdom": "^25.0.0",
-    "@playwright/test": "^1.49.0"
+  "peerDependenciesMeta": {
+    "jsdom": {
+      "optional": true
+    },
+    "@playwright/test": {
+      "optional": true
+    }
   },
   "license": "MIT"
 }

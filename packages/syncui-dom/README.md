@@ -10,8 +10,8 @@ npm i syncui-dom
 JSDOM adapter (server):
 ```ts
 import { WebsocketDOM } from "syncui";
-import { createDom } from "syncui-dom/adapter-jsdom";
-import { createWebSocketServerTransport } from "syncui";
+import { createDom } from "syncui-dom/adapter-server-jsdom";
+import { createWebSocketServerTransport } from "syncui/transport-ws/server";
 import { JSDOM } from "jsdom";
 
 const wsDom = new WebsocketDOM({
@@ -27,7 +27,17 @@ wss.on("connection", (ws) => {
 
 Browser adapter:
 ```ts
-import { createBrowserAdapter } from "syncui-dom/adapter-dom";
+import { createBrowserAdapter } from "syncui-dom/adapter-client-dom";
 
 const adapter = createBrowserAdapter();
+```
+
+Playwright adapter:
+```ts
+import { createPlaywrightAdapter } from "syncui-dom/adapter-server-playwright";
+import { chromium } from "@playwright/test";
+
+const browser = await chromium.launch();
+const page = await browser.newPage();
+const adapter = createPlaywrightAdapter({ page });
 ```

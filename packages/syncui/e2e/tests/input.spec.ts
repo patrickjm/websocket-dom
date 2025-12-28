@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { importScript } from "../setup/import-script";
+import { gotoTestSession } from "../setup/session";
 
 const script = `
 const form = document.createElement('form');
@@ -51,7 +52,7 @@ input.addEventListener('input', (e) => {
 test("should handle input element events and DOM syncing correctly", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, script);
 
   // Wait for elements to be created
@@ -72,7 +73,7 @@ test("should handle input element events and DOM syncing correctly", async ({
 });
 
 test("should handle keyboard events in input", async ({ page }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, script);
 
   const input = page.locator("#test-input");
@@ -91,7 +92,7 @@ test("should handle keyboard events in input", async ({ page }) => {
 });
 
 test("should handle selection edits and cursor behavior", async ({ page }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, script);
 
   const input = page.locator("#test-input");
@@ -124,7 +125,7 @@ test("should handle selection edits and cursor behavior", async ({ page }) => {
 });
 
 test("should handle IME composition and beforeinput flow", async ({ page }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, script);
 
   await page.waitForSelector("#test-input");
@@ -205,7 +206,7 @@ test("should handle IME composition and beforeinput flow", async ({ page }) => {
 test("should simulate keyboard input when only keydown arrives", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, simulateScript);
 
   await page.waitForSelector("#simulate-input");
@@ -264,7 +265,7 @@ test("should preserve focus/blur ordering across multiple inputs", async ({
   });
   `;
 
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, focusScript);
 
   await page.waitForSelector("#input-a");
@@ -307,7 +308,7 @@ test("should sync textarea and contenteditable input", async ({ page }) => {
   });
   `;
 
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, contentScript);
 
   const output = page.locator("#ce-output");
@@ -356,7 +357,7 @@ test("should handle form reset and invalid events", async ({ page }) => {
   });
   `;
 
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, formScript);
 
   const output = page.locator("#reset-output");
@@ -379,7 +380,7 @@ test("should handle form reset and invalid events", async ({ page }) => {
 });
 
 test("should tolerate rapid typing and fill sequences", async ({ page }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, script);
 
   const input = page.locator("#test-input");

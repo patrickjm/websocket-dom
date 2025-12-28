@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { gotoTestSession } from "../setup/session";
 
 test("should reconnect and request resync after disconnect", async ({
   page,
@@ -30,7 +31,7 @@ test("should reconnect and request resync after disconnect", async ({
     window.WebSocket = TrackingWebSocket as typeof WebSocket;
   });
 
-  await page.goto("/");
+  await gotoTestSession(page);
   await page.waitForFunction(
     () => (window as any).wsdomClient?.state?.snapshotApplied === true
   );

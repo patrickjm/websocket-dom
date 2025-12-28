@@ -1,6 +1,6 @@
 export { WebsocketDOM, createWebSocketServerTransport } from "syncui";
-export { createDom, type JsdomAdapterDeps } from "./adapter-jsdom";
+export { createDom, type JsdomAdapterDeps } from "./adapter-server-jsdom";
 export {
   createPlaywrightAdapter,
   type PlaywrightAdapterDeps,
-} from "./adapter-playwright";
+} from "./adapter-server-playwright";

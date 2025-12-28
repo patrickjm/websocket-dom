@@ -25,7 +25,7 @@
     "build:e2e": "vite build -c e2e/vite.config.ts",
     "clean": "touch ./dist && rm -r ./dist",
     "build": "yarn clean && yarn build:types && yarn build:server && yarn build:client",
-    "e2e": "playwright test",
+    "e2e": "SYNCUI_ADAPTER=jsdom playwright test && SYNCUI_ADAPTER=playwright playwright test",
     "e2e:server": "node --import tsx e2e/setup/start-server.ts",
     "start": "vite build && tsx ./src/index.ts",
     "dev": "nodemon --watch src --watch vite.config.ts --watch index.html --watch public --ext ts,html,json,tsx --exec yarn start"
@@ -38,6 +38,10 @@
     "./client": {
       "import": "./dist/client.js",
       "types": "./dist/client/index.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server.js",
+      "types": "./dist/server.d.ts"
     },
     "./shared-utils": {
       "import": "./dist/shared-utils.js",
@@ -75,6 +79,10 @@
       "import": "./dist/transport/ws-client.js",
       "types": "./dist/transport/ws-client.d.ts"
     },
+    "./transport-ws/client": {
+      "import": "./dist/transport/ws-client.js",
+      "types": "./dist/transport/ws-client.d.ts"
+    },
     "./transport-ws/server": {
       "import": "./dist/transport/ws-server.js",
       "types": "./dist/transport/ws-server.d.ts"
@@ -88,19 +96,18 @@
     "@types/node": "^22.5.4",
     "@types/ws": "^8.5.12",
     "@vitejs/plugin-react": "^4.3.1",
+    "express": "^4.19.2",
     "jsdom": "^25.0.0",
     "nodemon": "^3.1.4",
-    "syncui-dom": "^0.0.1",
     "tsx": "^4.19.0",
     "typed-emitter": "^2.1.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vite": "^5.4.3"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "vite": "^5.4.3",
     "ws": "^8.18.0"
   },
   "license": "MIT"

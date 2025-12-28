@@ -7,19 +7,19 @@ Status: early/WIP. The API and behavior may change.
 ## Install
 
 ```bash
-yarn add react-syncui
+yarn add react-syncui-dom
 ```
 
 ## Usage
 
-`loadReactWebsocketDOM` expects a small adapter with `import`, `on`, and `postWorkerMessage` methods. You can build one from `WebsocketDOM` like this:
+`loadReactSyncUiDom` expects a small adapter with `import`, `on`, and `postWorkerMessage` methods. You can build one from `WebsocketDOM` like this:
 
 ```ts
 import { WebsocketDOM } from "syncui";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";
 import { createDom } from "syncui-dom/adapter-jsdom";
 import { JSDOM } from "jsdom";
-import { loadReactWebsocketDOM } from "react-syncui";
+import { loadReactSyncUiDom } from "react-syncui-dom";
 
 const wsDom = new WebsocketDOM({
   htmlDocument: doc,
@@ -29,7 +29,7 @@ const wsDom = new WebsocketDOM({
 
 wsDom.addConnection(createWebSocketServerTransport(ws));
 
-loadReactWebsocketDOM({
+loadReactSyncUiDom({
   import: wsDom.domImport,
   on: wsDom.emitter.on.bind(wsDom.emitter),
   postWorkerMessage: wsDom.worker.postMessage.bind(wsDom.worker),

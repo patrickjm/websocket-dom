@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { importScript } from "../setup/import-script";
+import { gotoTestSession } from "../setup/session";
 
 const mutationScript = `
 const container = document.createElement('div');
@@ -107,7 +108,7 @@ node.innerText = 'second';
 test("should sync insertBefore/replaceChild/removeAttribute/classList/style mutations", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, mutationScript);
 
   const container = page.locator("#mutation-container");
@@ -135,7 +136,7 @@ test("should sync insertBefore/replaceChild/removeAttribute/classList/style muta
 test("should sync initial head/body/html state without scripts", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
 
   await page.waitForFunction(() => {
     const client = (window as any).wsdomClient;
@@ -153,7 +154,7 @@ test("should sync initial head/body/html state without scripts", async ({
 });
 
 test("should resync snapshot on demand", async ({ page }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, resyncScript);
 
   await expect(page.locator("body")).toHaveAttribute("data-state", "server");
@@ -170,7 +171,7 @@ test("should resync snapshot on demand", async ({ page }) => {
 });
 
 test("should sync innerText updates", async ({ page }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, innerTextScript);
 
   await expect(page.locator("#inner-text")).toHaveText("second");
@@ -179,7 +180,7 @@ test("should sync innerText updates", async ({ page }) => {
 test("should preserve node identity across detach and reparent", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, identityScript);
 
   await expect(page.locator("#moving")).toHaveText("detached");
@@ -190,7 +191,7 @@ test("should preserve node identity across detach and reparent", async ({
 test("should blacklist obvious executable content from sync", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoTestSession(page);
   await importScript(page, blacklistScript);
 
   await expect(page.locator("#blacklist-container")).toBeVisible();

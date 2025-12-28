@@ -16,7 +16,7 @@ export default defineConfig({
     command:
       "yarn build && yarn workspace syncui-dom build && yarn build:e2e && yarn e2e:server",
     url: "http://localhost:3333",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 60000,
     stdout: "ignore",
     stderr: "ignore",

@@ -20,7 +20,7 @@ export function createDom(
   deps: JsdomAdapterDeps
 ): UiAdapter {
   if (!deps?.JSDOM) {
-    throw new Error("JSDOM dependency is required for adapter-jsdom.");
+    throw new Error("JSDOM dependency is required for adapter-server-jsdom.");
   }
   const emitter = new EventEmitter() as DomEmitter;
   const dom = new deps.JSDOM(doc, {
@@ -98,10 +98,31 @@ export function createDom(
     }
   };
 
+  const getGlobalQueue = (): Promise<unknown> => {
+    const existing = (globalThis as any).__syncuiDomGlobalsQueue as
+      | Promise<unknown>
+      | undefined;
+    if (existing) {
+      return existing;
+    }
+    const created = Promise.resolve();
+    (globalThis as any).__syncuiDomGlobalsQueue = created;
+    return created;
+  };
+
+  const enqueueGlobals = <T>(fn: () => Promise<T>): Promise<T> => {
+    const current = getGlobalQueue();
+    const next = current.then(fn);
+    (globalThis as any).__syncuiDomGlobalsQueue = next.catch(() => {});
+    return next;
+  };
+
   function domImport(moduleUrl: string) {
-    void withGlobalsAsync(async () => {
-      await import(moduleUrl);
-    }).catch((err) => {
+    void enqueueGlobals(() =>
+      withGlobalsAsync(async () => {
+        await import(moduleUrl);
+      })
+    ).catch((err) => {
       console.error(`Error importing ${moduleUrl}: ${String(err)}`);
     });
   }
@@ -111,7 +132,7 @@ export function createDom(
   }
 
   async function evalString(code: string): Promise<unknown> {
-    return withGlobals(() => dom.window.eval(code));
+    return enqueueGlobals(async () => withGlobals(() => dom.window.eval(code)));
   }
 
   function collectAttributes(element: Element | null): [string, string][] {
@@ -129,22 +150,31 @@ export function createDom(
   }
 
   function getSnapshot(): Promise<SnapshotMessage> {
-    const { document } = dom.window;
-    const snapshot: SnapshotMessage = {
-      type: "snapshot",
-      htmlAttributes: collectAttributes(document.documentElement),
-      headAttributes: collectAttributes(document.head),
-      bodyAttributes: collectAttributes(document.body),
-      headHtml: document.head ? sanitizeElement(document.head).innerHTML : "",
-      bodyHtml: document.body ? sanitizeElement(document.body).innerHTML : "",
-    };
-    return Promise.resolve(snapshot);
+    return enqueueGlobals(async () =>
+      withGlobals(() => {
+        const { document } = dom.window;
+        return {
+          type: "snapshot",
+          htmlAttributes: collectAttributes(document.documentElement),
+          headAttributes: collectAttributes(document.head),
+          bodyAttributes: collectAttributes(document.body),
+          headHtml: document.head
+            ? sanitizeElement(document.head).innerHTML
+            : "",
+          bodyHtml: document.body
+            ? sanitizeElement(document.body).innerHTML
+            : "",
+        };
+      })
+    );
   }
 
   return {
     emitter,
     dispatchEvent: (event: SerializedEvent) =>
-      dispatchEvent(nodes, emitter, adapterWindow, event),
+      void enqueueGlobals(async () =>
+        withGlobals(() => dispatchEvent(nodes, emitter, adapterWindow, event))
+      ),
     domImport,
     terminate,
     evalString,
