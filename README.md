@@ -1,7 +1,7 @@
-# websocket-dom monorepo
+# syncui monorepo
 
 This repository contains:
-- packages/websocket-dom
+- packages/syncui
 - packages/react-websocket-dom
 
 Each package has its own README and release cadence.

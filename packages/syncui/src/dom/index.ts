@@ -1,0 +1,78 @@
+import { EventEmitter } from "events";
+import { createRequire } from "module";
+import type { SerializedEvent } from "../client/types";
+import { type DomEmitter } from "./instructions";
+import { type MessageFromWorker, type MessageToWorker } from "./utils";
+import { randomUUID } from "crypto";
+import type { SnapshotMessage } from "../ws-messages";
+
+const require = createRequire(import.meta.url);
+const WebWorker = require("web-worker");
+const WorkerCtor: typeof WebWorker = WebWorker.default ?? WebWorker;
+
+export function createDom(doc: string, { url }: { url: string }) {
+  const emitter = new EventEmitter() as DomEmitter;
+  const worker = new WorkerCtor(new URL("./worker.js", import.meta.url).toString());
+  const snapshotResolvers = new Map<string, (snapshot: SnapshotMessage) => void>();
+
+  worker.postMessage({ type: "init-dom", doc, url } as MessageToWorker);
+
+  function dispatchEvent(event: SerializedEvent) {
+    worker.postMessage({ type: "client-event", event } as MessageToWorker);
+  }
+
+  worker.onmessage = (_event: MessageEvent) => {
+    const event = _event.data as MessageFromWorker;
+    if (event.type === "instruction") {
+      emitter.emit("instruction", event.instruction);
+    } else if (event.type === "snapshot") {
+      const resolve = snapshotResolvers.get(event.id);
+      if (resolve) {
+        snapshotResolvers.delete(event.id);
+        resolve(event.snapshot);
+      }
+    } else if (event.type === "eval-result") {
+      emitter.emit("evalResult", { id: event.id, jsonString: event.jsonString });
+    }
+  };
+
+  function domImport(url: string) {
+    worker.postMessage({ type: "dom-import", url } as MessageToWorker);
+  }
+
+  function terminate() {
+    worker.terminate();
+  }
+
+  async function evalString(code: string): Promise<any> {
+    const id = randomUUID();
+    worker.postMessage({ type: "eval-string", code, id } as MessageToWorker);
+    return new Promise((resolve) => {
+      function listener(result: { id: string, jsonString: string }) {
+        if (result.id === id) {
+          emitter.removeListener("evalResult", listener);
+          resolve(JSON.parse(result.jsonString));
+        }
+      }
+      emitter.addListener("evalResult", listener);
+    });
+  }
+
+  function getSnapshot(): Promise<SnapshotMessage> {
+    const id = randomUUID();
+    worker.postMessage({ type: "snapshot-request", id } as MessageToWorker);
+    return new Promise((resolve) => {
+      snapshotResolvers.set(id, resolve);
+    });
+  }
+
+  return {
+    emitter,
+    dispatchEvent,
+    domImport,
+    terminate,
+    evalString,
+    getSnapshot,
+    worker
+  }
+}
