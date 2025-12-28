@@ -13,7 +13,8 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: "yarn build && yarn build:e2e && yarn e2e:server",
+    command:
+      "yarn build && yarn workspace syncui-dom build && yarn build:e2e && yarn e2e:server",
     url: "http://localhost:3333",
     reuseExistingServer: !process.env.CI,
     timeout: 60000,

@@ -1,4 +1,4 @@
-import type { DOMWindow } from "jsdom";
+import type { AdapterWindow } from "./window-types";
 import {
   AppendChild,
   CloneNode,
@@ -17,8 +17,8 @@ import {
   SetAttribute,
   SetProperty,
   type DomEmitter,
-} from "../core/ops/instructions";
-import { NodeStash } from "../core/model/nodes";
+} from "syncui/core/ops/instructions";
+import { NodeStash } from "syncui/core/model/nodes";
 import {
   hasUnsafeHtml,
   isScriptElement,
@@ -27,7 +27,7 @@ import {
 import { isTargetSuppressed } from "./suppress";
 
 export function extendPrototypes(
-  window: DOMWindow,
+  window: AdapterWindow,
   nodes: NodeStash,
   emitter: DomEmitter
 ) {
@@ -38,7 +38,7 @@ export function extendPrototypes(
     if (!node || !(node instanceof window.Element)) {
       return false;
     }
-    return isScriptElement(node);
+    return isScriptElement(node as Element);
   };
 
   const isSuppressedNode = (node: Node | null): boolean => {
@@ -71,10 +71,11 @@ export function extendPrototypes(
       return false;
     }
     if (isTargetSuppressed(element)) {
+      const htmlElement = element as HTMLElement;
       const isEditable =
-        element instanceof window.HTMLElement &&
-        (element.isContentEditable ||
-          element.getAttribute("contenteditable") !== null);
+        htmlElement instanceof window.HTMLElement &&
+        (htmlElement.isContentEditable ||
+          htmlElement.getAttribute("contenteditable") !== null);
       if (
         prop === "value" ||
         ((prop === "textContent" || prop === "innerText") && isEditable)
@@ -663,7 +664,7 @@ export function extendPrototypes(
     if (
       element &&
       element instanceof window.HTMLElement &&
-      element.style === this
+      (element as HTMLElement).style === this
     ) {
       styleAttributeSuppressed.add(element);
       originalStyleSetProperty.call(this, property, value, priority);
@@ -683,7 +684,7 @@ export function extendPrototypes(
     if (
       element &&
       element instanceof window.HTMLElement &&
-      element.style === this
+      (element as HTMLElement).style === this
     ) {
       styleAttributeSuppressed.add(element);
       const result = originalStyleRemoveProperty.call(this, property);
@@ -706,7 +707,7 @@ export function extendPrototypes(
         if (
           element &&
           element instanceof window.HTMLElement &&
-          element.style === this
+          (element as HTMLElement).style === this
         ) {
           styleAttributeSuppressed.add(element);
           styleTextDescriptor.set?.call(this, value);

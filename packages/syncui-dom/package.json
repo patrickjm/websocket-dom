@@ -1,0 +1,58 @@
+{
+  "name": "syncui-dom",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "README.md",
+    "dist",
+    "src",
+    "tsconfig.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"no tests\""
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./adapter-dom": {
+      "import": "./dist/adapter-dom.js",
+      "types": "./dist/adapter-dom.d.ts"
+    },
+    "./adapter-jsdom": {
+      "import": "./dist/adapter-jsdom.js",
+      "types": "./dist/adapter-jsdom.d.ts"
+    },
+    "./adapter-playwright": {
+      "import": "./dist/adapter-playwright.js",
+      "types": "./dist/adapter-playwright.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    }
+  },
+  "packageManager": "yarn@1.22.22",
+  "dependencies": {
+    "syncui": "^0.3.0"
+  },
+  "peerDependencies": {
+    "syncui": "^0.3.0",
+    "jsdom": "^25.0.0",
+    "@playwright/test": "^1.49.0"
+  },
+  "optionalDependencies": {
+    "jsdom": "^25.0.0",
+    "@playwright/test": "^1.49.0"
+  },
+  "license": "MIT"
+}

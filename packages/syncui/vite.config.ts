@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from "vite";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -6,22 +6,21 @@ export default defineConfig({
   server: {
     port: 3000,
   },
-  publicDir: 'public',
+  publicDir: "public",
   build: {
-    outDir: 'dist',
+    outDir: "dist",
     emptyOutDir: false,
-    sourcemap: 'inline',
+    sourcemap: "inline",
     minify: true,
     rollupOptions: {
-      external: ['events', 'jsdom'],
+      external: ["events"],
     },
     lib: {
       entry: {
-        client: 'src/client/index.tsx',
-        worker: 'src/dom/worker.ts'
+        client: "src/client/index.tsx",
       },
-      formats: ['es'],
+      formats: ["es"],
       fileName: (format, entryName) => `${entryName}.js`,
-    }
+    },
   },
-})
+});

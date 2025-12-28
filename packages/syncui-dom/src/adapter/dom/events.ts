@@ -1,4 +1,4 @@
-import type { DOMWindow } from "jsdom";
+import type { AdapterWindow } from "./window-types";
 import {
   type SerializedChangeEvent,
   type SerializedClickEvent,
@@ -11,18 +11,18 @@ import {
   type SerializedMouseEvent,
   type SerializedSubmitEvent,
   type SerializedWheelEvent,
-} from "../core/protocol/events";
-import type { NodeStash } from "../core/model/nodes";
-import { getElementFromXPath } from "../core/model/xpath";
-import type { DomEmitter } from "../core/ops/instructions";
+} from "syncui/core/protocol/events";
+import type { NodeStash } from "syncui/core/model/nodes";
+import { getElementFromXPath } from "syncui/core/model/xpath";
+import type { DomEmitter } from "syncui/core/ops/instructions";
 import { withSuppressedTarget } from "./suppress";
 
-type DispatchTarget = HTMLElement | Document | Window | DOMWindow;
+type DispatchTarget = HTMLElement | Document | AdapterWindow;
 
 export function dispatchEvent(
   nodes: NodeStash,
   emitter: DomEmitter,
-  window: DOMWindow,
+  window: AdapterWindow,
   event: SerializedEvent
 ) {
   const [targetElement, dispatchedEvent] = deserializeEvent(window, event);
@@ -41,7 +41,7 @@ export function dispatchEvent(
 }
 
 function deserializeEvent(
-  window: DOMWindow,
+  window: AdapterWindow,
   event: SerializedEvent
 ): [DispatchTarget | null, Event | null] {
   const targetElement = event.target
@@ -175,7 +175,7 @@ function deserializeEvent(
 
 function deserializeClickEvent(
   event: SerializedClickEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): MouseEvent {
   return new window.MouseEvent("click", {
     bubbles: true,
@@ -194,7 +194,7 @@ function deserializeClickEvent(
 
 function deserializeMouseButtonEvent(
   event: SerializedMouseButtonEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): MouseEvent {
   return new window.MouseEvent(event.type, {
     bubbles: true,
@@ -213,7 +213,7 @@ function deserializeMouseButtonEvent(
 
 function deserializeKeyboardEvent(
   event: SerializedKeyboardEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): KeyboardEvent {
   return new window.KeyboardEvent(event.type, {
     bubbles: true,
@@ -235,7 +235,7 @@ function deserializeKeyboardEvent(
 
 function deserializeFocusEvent(
   event: SerializedFocusEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): FocusEvent {
   return new window.FocusEvent(event.type, {
     bubbles: true,
@@ -247,7 +247,7 @@ function deserializeFocusEvent(
 
 function deserializeChangeEvent(
   event: SerializedChangeEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): Event {
   const changeEvent = new window.Event("change", {
     bubbles: true,
@@ -258,7 +258,7 @@ function deserializeChangeEvent(
 
 function deserializeInputEvent(
   event: SerializedInputEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): InputEvent {
   const inputEvent = new window.InputEvent("input", {
     bubbles: true,
@@ -272,7 +272,7 @@ function deserializeInputEvent(
 
 function deserializeSubmitEvent(
   event: SerializedSubmitEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): SubmitEvent {
   return new window.SubmitEvent("submit", {
     bubbles: true,
@@ -282,7 +282,7 @@ function deserializeSubmitEvent(
 
 function deserializeMouseEvent(
   event: SerializedMouseEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): MouseEvent {
   return new window.MouseEvent(event.type, {
     bubbles: true,
@@ -305,7 +305,7 @@ function deserializeMouseEvent(
 
 function deserializeDragEvent(
   event: SerializedDragEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): Event {
   if (typeof (window as any).DragEvent === "function") {
     return new (window as any).DragEvent(event.type, {
@@ -339,7 +339,7 @@ function deserializeDragEvent(
 
 function deserializeWheelEvent(
   event: SerializedWheelEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): Event {
   if (typeof window.WheelEvent === "function") {
     return new window.WheelEvent("wheel", {
@@ -362,7 +362,7 @@ function deserializeWheelEvent(
 
 function deserializePointerEvent(
   event: SerializedEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): Event {
   if (typeof (window as any).PointerEvent === "function") {
     return new (window as any).PointerEvent(event.type, {
@@ -376,7 +376,7 @@ function deserializePointerEvent(
 
 function deserializeTouchEvent(
   event: SerializedEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): Event {
   if (typeof (window as any).TouchEvent === "function") {
     return new (window as any).TouchEvent(event.type, {
@@ -389,7 +389,7 @@ function deserializeTouchEvent(
 
 function deserializeClipboardEvent(
   event: SerializedEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): Event {
   if (typeof (window as any).ClipboardEvent === "function") {
     return new (window as any).ClipboardEvent(event.type, {
@@ -402,7 +402,7 @@ function deserializeClipboardEvent(
 
 function deserializeCompositionEvent(
   event: SerializedEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): Event {
   if (typeof (window as any).CompositionEvent === "function") {
     return new (window as any).CompositionEvent(event.type, {
@@ -416,7 +416,7 @@ function deserializeCompositionEvent(
 
 function deserializeBeforeInputEvent(
   event: SerializedEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): Event {
   if (typeof (window as any).InputEvent === "function") {
     return new window.InputEvent("beforeinput", {
@@ -431,7 +431,7 @@ function deserializeBeforeInputEvent(
 
 function deserializeDefaultEvent(
   event: SerializedEvent,
-  window: DOMWindow
+  window: AdapterWindow
 ): Event {
   return new window.Event(event.type, {
     bubbles: true,
@@ -440,7 +440,7 @@ function deserializeDefaultEvent(
 }
 
 function isTextInputElement(
-  window: DOMWindow,
+  window: AdapterWindow,
   element: EventTarget
 ): element is HTMLInputElement | HTMLTextAreaElement {
   return (
@@ -450,7 +450,7 @@ function isTextInputElement(
 }
 
 function applyInputValue(
-  window: DOMWindow,
+  window: AdapterWindow,
   element: EventTarget,
   value: string,
   options: { suppress?: boolean } = {}
@@ -459,12 +459,14 @@ function applyInputValue(
   const apply = () => {
     if (isTextInputElement(window, element)) {
       element.value = value;
-    } else if (
-      element instanceof window.HTMLElement &&
-      (element.isContentEditable ||
-        element.getAttribute("contenteditable") !== null)
-    ) {
-      element.textContent = value;
+    } else if (element instanceof window.HTMLElement) {
+      const htmlElement = element as HTMLElement;
+      if (
+        htmlElement.isContentEditable ||
+        htmlElement.getAttribute("contenteditable") !== null
+      ) {
+        htmlElement.textContent = value;
+      }
     } else if (element && "value" in element) {
       (element as HTMLInputElement).value = value;
     }
@@ -477,7 +479,7 @@ function applyInputValue(
 }
 
 function simulateKeyboardInput(
-  window: DOMWindow,
+  window: AdapterWindow,
   element: EventTarget,
   event: SerializedEvent
 ) {
@@ -578,7 +580,10 @@ function isSimulatedEvent(event: SerializedEvent): boolean {
   return Boolean((event as { simulate?: boolean }).simulate);
 }
 
-function getFallbackTarget(window: DOMWindow, type: string): DispatchTarget {
+function getFallbackTarget(
+  window: AdapterWindow,
+  type: string
+): DispatchTarget {
   if (type === "resize" || type === "scroll") {
     return window;
   }

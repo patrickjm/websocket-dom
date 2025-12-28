@@ -1,6 +1,6 @@
-import type { SerializedEvent } from "../core/protocol/events";
-import type { SnapshotMessage } from "../core/protocol/messages";
-import type { Serialized } from "../core/ops/instructions";
+import type { SerializedEvent } from "syncui/core/protocol/events";
+import type { SnapshotMessage } from "syncui/core/protocol/messages";
+import type { Serialized } from "syncui/core/ops/instructions";
 
 export type MessageToWorker =
   | {

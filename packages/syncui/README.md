@@ -14,9 +14,9 @@ Security notice: there is not yet a comprehensive strategy to prevent untrusted 
 
 Installation:
 ```bash
-npm i syncui
+npm i syncui syncui-dom jsdom
 # or
-yarn add syncui
+yarn add syncui syncui-dom jsdom
 ```
 
 First, create your app code. This will run in a web-worker in the backend, but it feels just like client-side Javascript. 
@@ -38,6 +38,8 @@ Then set up the server (assuming you're using Express):
 
 ```ts
 import { WebsocketDOM, createWebSocketServerTransport } from 'syncui';
+import { createDom } from 'syncui-dom/adapter-jsdom';
+import { JSDOM } from 'jsdom';
 import http from 'http';
 import express from 'express';
 import { WebSocketServer } from 'ws';
@@ -51,7 +53,8 @@ const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const doc = '<!DOCTYPE html><html><body></body></html>';
 const wsDom = new WebsocketDOM({
   htmlDocument: doc,
-  url: 'http://localhost:3000'
+  url: 'http://localhost:3000',
+  adapter: (document, options) => createDom(document, options, { JSDOM }),
 });
 
 wss.on('connection', (ws) => {

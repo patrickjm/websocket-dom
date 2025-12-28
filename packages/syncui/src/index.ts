@@ -1,7 +1,6 @@
 import EventEmitter from "events";
 import type TypedEmitter from "typed-emitter";
 import type { SerializedEvent } from "./core/protocol/events";
-import { createDom } from "./dom";
 import { type Serialized } from "./core/ops/instructions";
 import type { InstructionMessage, Message } from "./core/protocol/messages";
 import type { UiAdapter, UiAdapterFactory } from "./core/adapter/types";
@@ -57,9 +56,12 @@ export class WebsocketDOM {
 
   constructor(options: WebsocketDomOptions) {
     const { htmlDocument, url, adapter } = options;
-    this.dom = adapter
-      ? adapter(htmlDocument, { url })
-      : createDom(htmlDocument, { url });
+    if (!adapter) {
+      throw new Error(
+        "WebsocketDOM requires an adapter. Install syncui-dom and pass adapter."
+      );
+    }
+    this.dom = adapter(htmlDocument, { url });
     this.worker = this.dom.worker;
     this.publicEmitter = new EventEmitter() as TypedEmitter<WebsocketDomEvents>;
 

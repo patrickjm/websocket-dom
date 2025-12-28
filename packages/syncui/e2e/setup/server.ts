@@ -5,6 +5,8 @@ import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
 import { WebsocketDOM } from "../../src";
 import { createWebSocketServerTransport } from "../../src/transport/ws-server";
+import { createDom } from "syncui-dom/adapter-jsdom";
+import { JSDOM } from "jsdom";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -49,6 +51,7 @@ export class TestServer {
     const session = new WebsocketDOM({
       htmlDocument: this.baseDoc,
       url: `http://localhost:${this.port}`,
+      adapter: (document, options) => createDom(document, options, { JSDOM }),
     });
     this.sessions.set(sessionId, session);
     return session;
