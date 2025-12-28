@@ -17,8 +17,8 @@ import {
   SetAttribute,
   SetProperty,
   type DomEmitter,
-} from "./instructions";
-import { NodeStash } from "./nodes";
+} from "../core/ops/instructions";
+import { NodeStash } from "../core/model/nodes";
 import {
   hasUnsafeHtml,
   isScriptElement,

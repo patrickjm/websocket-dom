@@ -1,7 +1,7 @@
 import { JSDOM } from "jsdom";
-import { NodeStash } from "./nodes";
+import { NodeStash } from "../core/model/nodes";
 import { extendPrototypes } from "./prototypes";
-import { type DomEmitter } from "./instructions";
+import { type DomEmitter } from "../core/ops/instructions";
 import { EventEmitter } from "events";
 import {
   createBrowserStorage,
@@ -10,7 +10,7 @@ import {
 } from "./utils";
 import { dispatchEvent } from "./events";
 import { sanitizeElement, shouldSkipAttribute } from "./sanitize";
-import type { SnapshotMessage } from "../ws-messages";
+import type { SnapshotMessage } from "../core/protocol/messages";
 
 let nodes: NodeStash;
 let dom: JSDOM;

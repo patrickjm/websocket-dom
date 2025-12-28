@@ -1,4 +1,4 @@
-import type { XPath } from "../shared-utils";
+import type { XPath } from "../../shared-utils";
 
 export interface BaseSerializedEvent {
   type: string;
@@ -7,7 +7,7 @@ export interface BaseSerializedEvent {
 }
 
 export interface SerializedClickEvent extends BaseSerializedEvent {
-  type: 'click';
+  type: "click";
   clientX: number;
   clientY: number;
   button: number;
@@ -19,7 +19,7 @@ export interface SerializedClickEvent extends BaseSerializedEvent {
 }
 
 export interface SerializedMouseButtonEvent extends BaseSerializedEvent {
-  type: 'mousedown' | 'mouseup' | 'dblclick' | 'contextmenu';
+  type: "mousedown" | "mouseup" | "dblclick" | "contextmenu";
   clientX: number;
   clientY: number;
   button: number;
@@ -31,7 +31,7 @@ export interface SerializedMouseButtonEvent extends BaseSerializedEvent {
 }
 
 export interface SerializedKeyboardEvent extends BaseSerializedEvent {
-  type: 'keydown' | 'keyup' | 'keypress';
+  type: "keydown" | "keyup" | "keypress";
   key: string;
   code: string;
   location: number;
@@ -47,11 +47,11 @@ export interface SerializedKeyboardEvent extends BaseSerializedEvent {
 }
 
 export interface SerializedFocusEvent extends BaseSerializedEvent {
-  type: 'focus' | 'blur' | 'focusin' | 'focusout';
+  type: "focus" | "blur" | "focusin" | "focusout";
 }
 
 export interface SerializedInputEvent extends BaseSerializedEvent {
-  type: 'input';
+  type: "input";
   value: string;
   inputType: string;
   data: string | null;
@@ -59,11 +59,11 @@ export interface SerializedInputEvent extends BaseSerializedEvent {
 }
 
 export interface SerializedSubmitEvent extends BaseSerializedEvent {
-  type: 'submit';
+  type: "submit";
 }
 
 export interface SerializedMouseEvent extends BaseSerializedEvent {
-  type: 'mouseenter' | 'mouseleave' | 'mousemove' | 'mouseout' | 'mouseover';
+  type: "mouseenter" | "mouseleave" | "mousemove" | "mouseout" | "mouseover";
   clientX: number;
   clientY: number;
   pageX: number;
@@ -77,7 +77,14 @@ export interface SerializedMouseEvent extends BaseSerializedEvent {
 }
 
 export interface SerializedDragEvent extends BaseSerializedEvent {
-  type: 'dragstart' | 'drag' | 'dragend' | 'dragenter' | 'dragover' | 'dragleave' | 'drop';
+  type:
+    | "dragstart"
+    | "drag"
+    | "dragend"
+    | "dragenter"
+    | "dragover"
+    | "dragleave"
+    | "drop";
   clientX: number;
   clientY: number;
   pageX: number;
@@ -91,7 +98,7 @@ export interface SerializedDragEvent extends BaseSerializedEvent {
 }
 
 export interface SerializedWheelEvent extends BaseSerializedEvent {
-  type: 'wheel';
+  type: "wheel";
   deltaX: number;
   deltaY: number;
   deltaZ: number;
@@ -106,34 +113,34 @@ export interface SerializedWheelEvent extends BaseSerializedEvent {
 
 export interface SerializedSimpleEvent extends BaseSerializedEvent {
   type:
-    | 'pointerdown'
-    | 'pointerup'
-    | 'pointermove'
-    | 'pointerenter'
-    | 'pointerleave'
-    | 'pointerover'
-    | 'pointerout'
-    | 'pointercancel'
-    | 'touchstart'
-    | 'touchmove'
-    | 'touchend'
-    | 'touchcancel'
-    | 'copy'
-    | 'cut'
-    | 'paste'
-    | 'compositionstart'
-    | 'compositionupdate'
-    | 'compositionend'
-    | 'beforeinput'
-    | 'selectionchange'
-    | 'scroll'
-    | 'resize'
-    | 'reset'
-    | 'invalid';
+    | "pointerdown"
+    | "pointerup"
+    | "pointermove"
+    | "pointerenter"
+    | "pointerleave"
+    | "pointerover"
+    | "pointerout"
+    | "pointercancel"
+    | "touchstart"
+    | "touchmove"
+    | "touchend"
+    | "touchcancel"
+    | "copy"
+    | "cut"
+    | "paste"
+    | "compositionstart"
+    | "compositionupdate"
+    | "compositionend"
+    | "beforeinput"
+    | "selectionchange"
+    | "scroll"
+    | "resize"
+    | "reset"
+    | "invalid";
 }
 
 export interface SerializedChangeEvent extends BaseSerializedEvent {
-  type: 'change';
+  type: "change";
   value: string;
 }
 

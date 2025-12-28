@@ -1,18 +1,18 @@
-import { getElementFromXPath } from "./events";
-import { getXPath, type WindowLike } from "../shared-utils";
+import { getElementFromXPath } from "./xpath";
+import { getXPath, type WindowLike } from "../../shared-utils";
 
 /** Reference to a node by XPath. */
 export interface XPathNodeRef {
-  type: 'xpath';
+  type: "xpath";
   xpath: string;
 }
 
-/** 
+/**
  * Reference to a node by its stash ID.
  * Stash IDs are synced between client/server.
  */
 export interface StashedIdNodeRef {
-  type: 'stashed-id';
+  type: "stashed-id";
   id: number;
 }
 
@@ -40,14 +40,14 @@ export class NodeStash {
     const existing = this.idByNode.get(node);
     if (existing !== undefined) {
       this.lastStashedId = existing;
-      return { type: 'stashed-id', id: existing };
+      return { type: "stashed-id", id: existing };
     }
     const _id = id ?? this.nextId;
     this.stashed.set(_id, node);
     this.idByNode.set(node, _id);
     this.nextId = _id + 1;
     this.lastStashedId = _id;
-    return { type: 'stashed-id', id: _id };
+    return { type: "stashed-id", id: _id };
   }
 
   public peek(): StashedNode | null {
@@ -55,22 +55,22 @@ export class NodeStash {
   }
 
   public get(id: NodeRef): StashedNode | null {
-    if (id.type === 'stashed-id') {
+    if (id.type === "stashed-id") {
       return this.stashed.get(id.id) ?? null;
-    } else if (id.type === 'xpath') {
+    } else if (id.type === "xpath") {
       return getElementFromXPath(id.xpath, this.window.document) ?? null;
     }
-    throw new Error('Unknown node ref type: ' + id);
+    throw new Error("Unknown node ref type: " + id);
   }
 
   public findRefFor(node: StashedNode): NodeRef | null {
     const existing = this.idByNode.get(node);
     if (existing !== undefined) {
-      return { type: 'stashed-id', id: existing };
+      return { type: "stashed-id", id: existing };
     }
     const xpath = getXPath(node as Element, this.window);
     if (xpath) {
-      return { type: 'xpath', xpath };
+      return { type: "xpath", xpath };
     }
     return null;
   }

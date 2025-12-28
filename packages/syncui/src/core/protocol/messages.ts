@@ -1,32 +1,32 @@
-import type { SerializedEvent } from "./client/types";
-import type { Serialized } from "./dom/instructions";
+import type { SerializedEvent } from "./events";
+import type { Serialized } from "../ops/instructions";
 
 export interface InstructionMessage {
-  type: 'instructions';
+  type: "instructions";
   instructions: readonly Serialized[];
 }
 
 export interface ErrorMessage {
-  type: 'error';
+  type: "error";
   error: string;
   errorInfo: string;
 }
 
 export interface EventMessage {
-  type: 'event';
+  type: "event";
   event: SerializedEvent;
 }
 
 export interface ReadyMessage {
-  type: 'ready';
+  type: "ready";
 }
 
 export interface ResyncMessage {
-  type: 'resync';
+  type: "resync";
 }
 
 export interface SnapshotMessage {
-  type: 'snapshot';
+  type: "snapshot";
   htmlAttributes: [string, string][];
   headAttributes: [string, string][];
   bodyAttributes: [string, string][];
@@ -34,4 +34,10 @@ export interface SnapshotMessage {
   bodyHtml: string;
 }
 
-export type Message = InstructionMessage | ErrorMessage | EventMessage | ReadyMessage | ResyncMessage | SnapshotMessage;
+export type Message =
+  | InstructionMessage
+  | ErrorMessage
+  | EventMessage
+  | ReadyMessage
+  | ResyncMessage
+  | SnapshotMessage;

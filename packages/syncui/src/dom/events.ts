@@ -11,10 +11,10 @@ import {
   type SerializedMouseEvent,
   type SerializedSubmitEvent,
   type SerializedWheelEvent,
-} from "../client/types";
-import { type XPath } from "../shared-utils";
-import type { NodeStash } from "./nodes";
-import type { DomEmitter } from "./instructions";
+} from "../core/protocol/events";
+import type { NodeStash } from "../core/model/nodes";
+import { getElementFromXPath } from "../core/model/xpath";
+import type { DomEmitter } from "../core/ops/instructions";
 import { withSuppressedTarget } from "./suppress";
 
 type DispatchTarget = HTMLElement | Document | Window | DOMWindow;
@@ -171,24 +171,6 @@ function deserializeEvent(
         deserializeDefaultEvent(event, window),
       ];
   }
-}
-
-export function getElementFromXPath(
-  xpath: XPath,
-  document: Document
-): HTMLElement | null {
-  if (xpath === "/html") {
-    return document.documentElement;
-  }
-  if (xpath === "/html/head") {
-    return document.head;
-  }
-  if (xpath === "/html/body") {
-    return document.body;
-  }
-  const FIRST_ORDERED_NODE_TYPE = 9;
-  return document.evaluate(xpath, document, null, FIRST_ORDERED_NODE_TYPE, null)
-    .singleNodeValue as HTMLElement;
 }
 
 function deserializeClickEvent(

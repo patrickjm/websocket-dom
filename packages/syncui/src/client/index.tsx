@@ -1,8 +1,8 @@
-import type { EventMessage, Message } from "../ws-messages";
-import { NodeStash } from "../dom/nodes";
+import type { EventMessage, Message } from "../core/protocol/messages";
+import { NodeStash } from "../core/model/nodes";
 import { debounce } from "../shared-utils";
 import { serializeEvent } from "./events";
-import * as Instr from "../dom/instructions";
+import * as Instr from "../core/ops/instructions";
 
 /**
  * Creates a client that connects to a syncui server and starts the sync.

@@ -1,10 +1,10 @@
 import { EventEmitter } from "events";
 import { createRequire } from "module";
-import type { SerializedEvent } from "../client/types";
-import { type DomEmitter } from "./instructions";
+import type { SerializedEvent } from "../core/protocol/events";
+import { type DomEmitter } from "../core/ops/instructions";
 import { type MessageFromWorker, type MessageToWorker } from "./utils";
 import { randomUUID } from "crypto";
-import type { SnapshotMessage } from "../ws-messages";
+import type { SnapshotMessage } from "../core/protocol/messages";
 
 const require = createRequire(import.meta.url);
 const WebWorker = require("web-worker");
@@ -12,8 +12,13 @@ const WorkerCtor: typeof WebWorker = WebWorker.default ?? WebWorker;
 
 export function createDom(doc: string, { url }: { url: string }) {
   const emitter = new EventEmitter() as DomEmitter;
-  const worker = new WorkerCtor(new URL("./worker.js", import.meta.url).toString());
-  const snapshotResolvers = new Map<string, (snapshot: SnapshotMessage) => void>();
+  const worker = new WorkerCtor(
+    new URL("./worker.js", import.meta.url).toString()
+  );
+  const snapshotResolvers = new Map<
+    string,
+    (snapshot: SnapshotMessage) => void
+  >();
 
   worker.postMessage({ type: "init-dom", doc, url } as MessageToWorker);
 
@@ -32,7 +37,10 @@ export function createDom(doc: string, { url }: { url: string }) {
         resolve(event.snapshot);
       }
     } else if (event.type === "eval-result") {
-      emitter.emit("evalResult", { id: event.id, jsonString: event.jsonString });
+      emitter.emit("evalResult", {
+        id: event.id,
+        jsonString: event.jsonString,
+      });
     }
   };
 
@@ -48,7 +56,7 @@ export function createDom(doc: string, { url }: { url: string }) {
     const id = randomUUID();
     worker.postMessage({ type: "eval-string", code, id } as MessageToWorker);
     return new Promise((resolve) => {
-      function listener(result: { id: string, jsonString: string }) {
+      function listener(result: { id: string; jsonString: string }) {
         if (result.id === id) {
           emitter.removeListener("evalResult", listener);
           resolve(JSON.parse(result.jsonString));
@@ -73,6 +81,6 @@ export function createDom(doc: string, { url }: { url: string }) {
     terminate,
     evalString,
     getSnapshot,
-    worker
-  }
+    worker,
+  };
 }

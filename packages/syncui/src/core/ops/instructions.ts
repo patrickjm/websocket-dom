@@ -1,5 +1,5 @@
 import type TypedEmitter from "typed-emitter";
-import type { NodeRef, NodeStash, StashedIdNodeRef } from "./nodes";
+import type { NodeRef, NodeStash, StashedIdNodeRef } from "../model/nodes";
 
 export type DomEmitterEvents = {
   instruction: (instruction: Serialized) => void;

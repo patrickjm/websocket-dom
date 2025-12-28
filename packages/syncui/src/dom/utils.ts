@@ -1,38 +1,46 @@
-import type { SerializedEvent } from "client/types";
-import type { SnapshotMessage } from "../ws-messages";
-import type { Serialized } from "./instructions";
+import type { SerializedEvent } from "../core/protocol/events";
+import type { SnapshotMessage } from "../core/protocol/messages";
+import type { Serialized } from "../core/ops/instructions";
 
-export type MessageToWorker = {
-  type: "init-dom";
-  doc: string;
-  url: string;
-} | {
-  type: "snapshot-request";
-  id: string;
-} | {
-  type: "client-event";
-  event: SerializedEvent;
-} | {
-  type: "dom-import";
-  url: string;
-} | {
-  type: "eval-string";
-  code: string;
-  id: string;
-}
+export type MessageToWorker =
+  | {
+      type: "init-dom";
+      doc: string;
+      url: string;
+    }
+  | {
+      type: "snapshot-request";
+      id: string;
+    }
+  | {
+      type: "client-event";
+      event: SerializedEvent;
+    }
+  | {
+      type: "dom-import";
+      url: string;
+    }
+  | {
+      type: "eval-string";
+      code: string;
+      id: string;
+    };
 
-export type MessageFromWorker = {
-  type: "instruction";
-  instruction: Serialized;
-} | {
-  type: "snapshot";
-  id: string;
-  snapshot: SnapshotMessage;
-} | {
-  type: "eval-result";
-  jsonString: string;
-  id: string;
-}
+export type MessageFromWorker =
+  | {
+      type: "instruction";
+      instruction: Serialized;
+    }
+  | {
+      type: "snapshot";
+      id: string;
+      snapshot: SnapshotMessage;
+    }
+  | {
+      type: "eval-result";
+      jsonString: string;
+      id: string;
+    };
 
 export function createBrowserStorage() {
   let storage = new Map<string, string>();
@@ -55,6 +63,6 @@ export function createBrowserStorage() {
     },
     clear() {
       storage.clear();
-    }
+    },
   };
 }
