@@ -1,13 +1,13 @@
-import type { WebsocketDomClient } from "../../src/client";
+import type { SyncUIClient } from "../../src/client";
 
 export type SyncuiTestBridge = {
-  client: WebsocketDomClient | null;
+  client: SyncUIClient | null;
   eventLog: string[];
   wsSendLog: string[];
   wsInstances: WebSocket[];
 };
 
-export function initSyncuiTestBridge(client: WebsocketDomClient) {
+export function initSyncuiTestBridge(client: SyncUIClient) {
   if (!window.syncuiTestBridge) {
     window.syncuiTestBridge = {
       client,

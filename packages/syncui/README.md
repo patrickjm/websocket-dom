@@ -2,7 +2,7 @@
 
 ![NPM Version](https://img.shields.io/npm/v/syncui)
 
-Experimental partial 2-way sync between backend JSDOM and frontend DOM using WebSockets.
+Experimental 2-way sync between backend DOM adapters (JSDOM/Playwright) and frontend DOM using WebSockets.
 
 Fully control the client document and respond to user events from the backend.
 
@@ -12,14 +12,16 @@ Security notice: there is not yet a comprehensive strategy to prevent untrusted 
 
 ## Usage
 
-Installation:
+Installation (pick the adapter you need):
 ```bash
 npm i syncui syncui-dom jsdom
 # or
 yarn add syncui syncui-dom jsdom
 ```
 
-First, create your app code. This will run in a web-worker in the backend, but it feels just like client-side Javascript. 
+If you plan to use the Playwright adapter, install `@playwright/test` instead of `jsdom`.
+
+First, create your app code. This will run in a web-worker in the backend, but it feels just like client-side Javascript.
 
 In your build step, you need to make sure the worker.js file is compiled to the `dist` folder separately as its own entrypoint.
 
@@ -37,22 +39,24 @@ document.body.appendChild(btn);
 Then set up the server (assuming you're using Express):
 
 ```ts
-import { WebsocketDOM } from 'syncui';
-import { createWebSocketServerTransport } from 'syncui/transport-ws/server';
-import { createJsdomAdapter } from 'syncui-dom/adapter-server-jsdom';
-import { JSDOM } from 'jsdom';
-import http from 'http';
-import express from 'express';
-import { WebSocketServer } from 'ws';
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import express from "express";
+import http from "http";
+import { WebSocketServer } from "ws";
+import { SyncUIServerSession } from "syncui";
+import { createWebSocketServerTransport } from "syncui/transport-ws/server";
+import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
+import { JSDOM } from "jsdom";
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const doc = '<!DOCTYPE html><html><body></body></html>';
-const wsDom = new WebsocketDOM({
+const wsDom = new SyncUIServerSession({
   htmlDocument: doc,
   url: 'http://localhost:3000',
   adapter: (document, options) => createJsdomAdapter(document, options, { JSDOM }),
@@ -64,7 +68,7 @@ wss.on('connection', (ws) => {
 
 // This must be a relative path to the compiled worker.js file in the dist folder,
 // NOT the typescript file.
-wsDom.domImport(path.join(__dirname.replace('src', 'dist'), 'worker.js'));
+wsDom.import(join(__dirname.replace("src", "dist"), "worker.js"));
 
 server.listen(3000, () => {
   console.log('Server is running on port 3000');
@@ -74,9 +78,9 @@ server.listen(3000, () => {
 Next we need to set up the client code that actually runs in the browser. This will require a bundler. It will automatically create a websocket connection, watch for client-side events, and update the DOM from backend instructions:
 
 ```ts
-import { createClient } from "syncui/client";
+import { SyncUIClient } from "syncui/client";
 
-export const client = createClient("ws://localhost:3000", {
+export const client = new SyncUIClient("ws://localhost:3000", {
   reconnect: {
     enabled: true,
     maxAttempts: 10,
@@ -85,6 +89,7 @@ export const client = createClient("ws://localhost:3000", {
     jitterRatio: 0.2,
   },
 });
+client.connect();
 ```
 
 ## How it works

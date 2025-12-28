@@ -1,4 +1,4 @@
-export { createClient } from "syncui/client";
+export { SyncUIClient } from "syncui/client";
 export {
   createClientDomAdapter,
   type BrowserAdapterOptions,

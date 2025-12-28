@@ -1,1 +1,1 @@
-export { WebsocketDOM, createWebSocketServerTransport } from "./index";
+export { SyncUIServerSession, createWebSocketServerTransport } from "./index";

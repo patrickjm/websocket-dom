@@ -6,10 +6,6 @@ import * as Instr from "../core/ops/instructions";
 import type { TransportConnection } from "../core/transport/types";
 import { createWebSocketClientTransport } from "../transport/ws-client";
 
-/**
- * Creates a client that connects to a syncui server and starts the sync.
- * @param uri The URI to connect to, e.g. ws://localhost:3000
- */
 export type ReconnectOptions = {
   enabled?: boolean;
   maxAttempts?: number;
@@ -22,40 +18,17 @@ export type ClientOptions = {
   reconnect?: ReconnectOptions;
 };
 
-export type WebsocketDomClient = {
-  transport: TransportConnection | null;
-  state: {
-    snapshotApplied: boolean;
-    lastMessageType: string;
-    pendingResync: boolean;
-    reconnecting: boolean;
-    reconnectAttempts: number;
-  };
-  resync: () => void;
-  close: () => void;
-  connect: () => void;
+export type SyncUIClientState = {
+  snapshotApplied: boolean;
+  lastMessageType: string;
+  pendingResync: boolean;
+  reconnecting: boolean;
+  reconnectAttempts: number;
 };
 
-export function createClient(
-  url: string,
-  options: ClientOptions = {}
-): WebsocketDomClient {
-  const reconnect = {
-    enabled: options.reconnect?.enabled ?? true,
-    maxAttempts: options.reconnect?.maxAttempts ?? Number.POSITIVE_INFINITY,
-    baseDelayMs: options.reconnect?.baseDelayMs ?? 500,
-    maxDelayMs: options.reconnect?.maxDelayMs ?? 10_000,
-    jitterRatio: options.reconnect?.jitterRatio ?? 0.2,
-  };
-  let transport: TransportConnection | null = null;
-  const nodes = new NodeStash(window);
-  console.log("nodes", nodes);
-  let readyInterval: number | null = null;
-  let reconnectTimer: number | null = null;
-  let reconnectAttempts = 0;
-  let manuallyClosed = false;
-  let connectedOnce = false;
-  const state = {
+export class SyncUIClient {
+  public transport: TransportConnection | null = null;
+  public readonly state: SyncUIClientState = {
     snapshotApplied: false,
     lastMessageType: "",
     pendingResync: false,
@@ -63,48 +36,139 @@ export function createClient(
     reconnectAttempts: 0,
   };
 
-  const sendPayload = (payload: unknown) => {
-    if (!transport || !transport.isOpen()) {
+  private readonly url: string;
+  private readonly reconnect: Required<ReconnectOptions>;
+  private readonly nodes: NodeStash;
+  private readyInterval: number | null = null;
+  private reconnectTimer: number | null = null;
+  private reconnectAttempts = 0;
+  private manuallyClosed = false;
+  private connectedOnce = false;
+
+  constructor(url: string, options: ClientOptions = {}) {
+    this.url = url;
+    this.reconnect = {
+      enabled: options.reconnect?.enabled ?? true,
+      maxAttempts: options.reconnect?.maxAttempts ?? Number.POSITIVE_INFINITY,
+      baseDelayMs: options.reconnect?.baseDelayMs ?? 500,
+      maxDelayMs: options.reconnect?.maxDelayMs ?? 10_000,
+      jitterRatio: options.reconnect?.jitterRatio ?? 0.2,
+    };
+    this.nodes = new NodeStash(window);
+    this.installEventListeners();
+  }
+
+  connect() {
+    if (this.manuallyClosed) {
+      return;
+    }
+    this.state.snapshotApplied = false;
+    const nextTransport = createWebSocketClientTransport(this.url);
+    this.transport = nextTransport;
+    const messageUnsub = nextTransport.onMessage((data) => {
+      this.handleMessage(data);
+    });
+    let closeUnsub: (() => void) | null = null;
+
+    nextTransport.onOpen?.(() => {
+      this.reconnectAttempts = 0;
+      this.state.reconnectAttempts = 0;
+      this.state.reconnecting = false;
+      this.sendReady();
+      if (this.readyInterval === null) {
+        this.readyInterval = window.setInterval(() => {
+          if (this.state.snapshotApplied) {
+            if (this.readyInterval !== null) {
+              clearInterval(this.readyInterval);
+              this.readyInterval = null;
+            }
+            return;
+          }
+          this.sendReady();
+        }, 250);
+      }
+      if (this.connectedOnce || this.state.pendingResync) {
+        this.state.pendingResync = false;
+        this.sendPayload({ type: "resync" });
+      }
+      this.connectedOnce = true;
+    });
+    nextTransport.onError?.((error) => {
+      console.error("WebSocket error:", error);
+    });
+    closeUnsub = nextTransport.onClose(() => {
+      messageUnsub();
+      closeUnsub?.();
+      closeUnsub = null;
+      if (this.readyInterval !== null) {
+        clearInterval(this.readyInterval);
+        this.readyInterval = null;
+      }
+      this.scheduleReconnect();
+    });
+  }
+
+  close() {
+    this.manuallyClosed = true;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.readyInterval !== null) {
+      clearInterval(this.readyInterval);
+      this.readyInterval = null;
+    }
+    this.transport?.close();
+  }
+
+  resync(): void {
+    if (!this.sendPayload({ type: "resync" })) {
+      this.state.pendingResync = true;
+    }
+  }
+
+  private sendPayload(payload: unknown) {
+    if (!this.transport || !this.transport.isOpen()) {
       return false;
     }
-    transport.send(JSON.stringify(payload));
+    this.transport.send(JSON.stringify(payload));
     return true;
-  };
+  }
 
-  const sendReady = () => {
-    sendPayload({ type: "ready" });
-  };
+  private sendReady() {
+    this.sendPayload({ type: "ready" });
+  }
 
-  const scheduleReconnect = () => {
-    if (!reconnect.enabled || manuallyClosed) {
+  private scheduleReconnect() {
+    if (!this.reconnect.enabled || this.manuallyClosed) {
       return;
     }
-    if (reconnectTimer !== null) {
+    if (this.reconnectTimer !== null) {
       return;
     }
-    if (reconnectAttempts >= reconnect.maxAttempts) {
+    if (this.reconnectAttempts >= this.reconnect.maxAttempts) {
       return;
     }
     const baseDelay = Math.min(
-      reconnect.baseDelayMs * 2 ** reconnectAttempts,
-      reconnect.maxDelayMs
+      this.reconnect.baseDelayMs * 2 ** this.reconnectAttempts,
+      this.reconnect.maxDelayMs
     );
-    const jitter = baseDelay * reconnect.jitterRatio * (Math.random() * 2 - 1);
+    const jitter = baseDelay * this.reconnect.jitterRatio * (Math.random() * 2 - 1);
     const delay = Math.max(0, baseDelay + jitter);
-    reconnectAttempts += 1;
-    state.reconnectAttempts = reconnectAttempts;
-    state.reconnecting = true;
-    reconnectTimer = window.setTimeout(() => {
-      reconnectTimer = null;
-      connect();
+    this.reconnectAttempts += 1;
+    this.state.reconnectAttempts = this.reconnectAttempts;
+    this.state.reconnecting = true;
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
     }, delay);
-  };
+  }
 
-  const handleMessage = (data: string) => {
+  private handleMessage(data: string) {
     const message = JSON.parse(data) as Message;
-    state.lastMessageType = message.type;
+    this.state.lastMessageType = message.type;
     if (message.type === "snapshot") {
-      state.snapshotApplied = true;
+      this.state.snapshotApplied = true;
       const applyAttributes = (
         element: Element | null,
         attributes: [string, string][]
@@ -131,7 +195,7 @@ export function createClient(
         switch (type) {
           case Instr.InstructionType.CreateElement:
             Instr.CreateElement.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.CreateElement.deserialize(
                 instruction as Instr.CreateElement.Serialized
               )
@@ -139,7 +203,7 @@ export function createClient(
             break;
           case Instr.InstructionType.SetAttribute:
             Instr.SetAttribute.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.SetAttribute.deserialize(
                 instruction as Instr.SetAttribute.Serialized
               )
@@ -147,7 +211,7 @@ export function createClient(
             break;
           case Instr.InstructionType.SetProperty:
             Instr.SetProperty.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.SetProperty.deserialize(
                 instruction as Instr.SetProperty.Serialized
               )
@@ -155,7 +219,7 @@ export function createClient(
             break;
           case Instr.InstructionType.AppendChild:
             Instr.AppendChild.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.AppendChild.deserialize(
                 instruction as Instr.AppendChild.Serialized
               )
@@ -163,7 +227,7 @@ export function createClient(
             break;
           case Instr.InstructionType.CreateDocumentFragment:
             Instr.CreateDocumentFragment.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.CreateDocumentFragment.deserialize(
                 instruction as Instr.CreateDocumentFragment.Serialized
               )
@@ -171,7 +235,7 @@ export function createClient(
             break;
           case Instr.InstructionType.CreateTextNode:
             Instr.CreateTextNode.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.CreateTextNode.deserialize(
                 instruction as Instr.CreateTextNode.Serialized
               )
@@ -179,7 +243,7 @@ export function createClient(
             break;
           case Instr.InstructionType.RemoveChild:
             Instr.RemoveChild.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.RemoveChild.deserialize(
                 instruction as Instr.RemoveChild.Serialized
               )
@@ -187,7 +251,7 @@ export function createClient(
             break;
           case Instr.InstructionType.CloneNode:
             Instr.CloneNode.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.CloneNode.deserialize(
                 instruction as Instr.CloneNode.Serialized
               )
@@ -195,7 +259,7 @@ export function createClient(
             break;
           case Instr.InstructionType.InsertAdjacentElement:
             Instr.InsertAdjacentElement.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.InsertAdjacentElement.deserialize(
                 instruction as Instr.InsertAdjacentElement.Serialized
               )
@@ -203,7 +267,7 @@ export function createClient(
             break;
           case Instr.InstructionType.InsertAdjacentHTML:
             Instr.InsertAdjacentHTML.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.InsertAdjacentHTML.deserialize(
                 instruction as Instr.InsertAdjacentHTML.Serialized
               )
@@ -211,7 +275,7 @@ export function createClient(
             break;
           case Instr.InstructionType.InsertAdjacentText:
             Instr.InsertAdjacentText.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.InsertAdjacentText.deserialize(
                 instruction as Instr.InsertAdjacentText.Serialized
               )
@@ -219,7 +283,7 @@ export function createClient(
             break;
           case Instr.InstructionType.PrependChild:
             Instr.PrependChild.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.PrependChild.deserialize(
                 instruction as Instr.PrependChild.Serialized
               )
@@ -227,7 +291,7 @@ export function createClient(
             break;
           case Instr.InstructionType.Normalize:
             Instr.Normalize.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.Normalize.deserialize(
                 instruction as Instr.Normalize.Serialized
               )
@@ -235,7 +299,7 @@ export function createClient(
             break;
           case Instr.InstructionType.InsertBefore:
             Instr.InsertBefore.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.InsertBefore.deserialize(
                 instruction as Instr.InsertBefore.Serialized
               )
@@ -243,7 +307,7 @@ export function createClient(
             break;
           case Instr.InstructionType.ReplaceChild:
             Instr.ReplaceChild.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.ReplaceChild.deserialize(
                 instruction as Instr.ReplaceChild.Serialized
               )
@@ -251,7 +315,7 @@ export function createClient(
             break;
           case Instr.InstructionType.RemoveAttribute:
             Instr.RemoveAttribute.apply(
-              { window, nodes },
+              { window, nodes: this.nodes },
               Instr.RemoveAttribute.deserialize(
                 instruction as Instr.RemoveAttribute.Serialized
               )
@@ -262,185 +326,115 @@ export function createClient(
     } else if (message.type === "error") {
       console.error(message.error, message.errorInfo);
     }
-  };
+  }
 
-  const connect = () => {
-    if (manuallyClosed) {
-      return;
-    }
-    state.snapshotApplied = false;
-    const nextTransport = createWebSocketClientTransport(url);
-    transport = nextTransport;
-    client.transport = nextTransport;
-    const messageUnsub = nextTransport.onMessage(handleMessage);
-    let closeUnsub: (() => void) | null = null;
-
-    nextTransport.onOpen?.(() => {
-      reconnectAttempts = 0;
-      state.reconnectAttempts = 0;
-      state.reconnecting = false;
-      sendReady();
-      if (readyInterval === null) {
-        readyInterval = window.setInterval(() => {
-          if (state.snapshotApplied) {
-            if (readyInterval !== null) {
-              clearInterval(readyInterval);
-              readyInterval = null;
-            }
-            return;
-          }
-          sendReady();
-        }, 250);
-      }
-      if (connectedOnce || state.pendingResync) {
-        state.pendingResync = false;
-        sendPayload({ type: "resync" });
-      }
-      connectedOnce = true;
-      console.log("Connection opened");
-    });
-    nextTransport.onError?.((error) => {
-      console.error("WebSocket error:", error);
-    });
-    closeUnsub = nextTransport.onClose(() => {
-      messageUnsub();
-      closeUnsub?.();
-      closeUnsub = null;
-      if (readyInterval !== null) {
-        clearInterval(readyInterval);
-        readyInterval = null;
-      }
-      console.log("Connection closed");
-      scheduleReconnect();
-    });
-  };
-
-  const close = () => {
-    manuallyClosed = true;
-    if (reconnectTimer !== null) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    if (readyInterval !== null) {
-      clearInterval(readyInterval);
-      readyInterval = null;
-    }
-    if (transport) {
-      transport.close();
-    }
-  };
-
-  function sendEvent(event: Event, overrideType?: string): void {
+  private sendEvent(event: Event, overrideType?: string): void {
     const serializedEvent = serializeEvent(event);
     const payload = overrideType
       ? { ...serializedEvent, type: overrideType }
       : serializedEvent;
-    sendPayload({
+    this.sendPayload({
       type: "event",
       event: payload,
     } as EventMessage);
   }
 
-  function resync(): void {
-    if (!sendPayload({ type: "resync" })) {
-      state.pendingResync = true;
+  private installEventListeners() {
+    const eventTypes = [
+      "click",
+      "mousedown",
+      "mouseup",
+      "dblclick",
+      "contextmenu",
+      "keydown",
+      "keypress",
+      "keyup",
+      "input",
+      "change",
+      "submit",
+      "focus",
+      "blur",
+      "focusin",
+      "focusout",
+      "dragstart",
+      "drag",
+      "dragend",
+      "dragenter",
+      "dragover",
+      "dragleave",
+      "drop",
+      "pointerdown",
+      "pointerup",
+      "pointermove",
+      "pointerenter",
+      "pointerleave",
+      "pointerover",
+      "pointerout",
+      "pointercancel",
+      "touchstart",
+      "touchmove",
+      "touchend",
+      "touchcancel",
+      "copy",
+      "cut",
+      "paste",
+      "compositionstart",
+      "compositionupdate",
+      "compositionend",
+      "beforeinput",
+      "selectionchange",
+      "reset",
+      "invalid",
+      "wheel",
+      "scroll",
+    ];
+    for (const eventType of eventTypes) {
+      document.addEventListener(
+        eventType,
+        (event) => {
+          this.sendEvent(event);
+        },
+        true
+      );
     }
+
+    const debouncedSendMouseEvent = debounce((event: Event) => {
+      this.sendEvent(event);
+    }, 250);
+    const mouseEventTypes = ["mouseover", "mouseout", "mousemove"];
+    for (const eventType of mouseEventTypes) {
+      const handler =
+        eventType === "mousemove"
+          ? debouncedSendMouseEvent
+          : (event: Event) => {
+              this.sendEvent(event);
+            };
+      document.addEventListener(eventType, handler as EventListener, true);
+    }
+    document.addEventListener(
+      "mouseover",
+      (event) => {
+        this.sendEvent(event, "mouseenter");
+      },
+      true
+    );
+    document.addEventListener(
+      "mouseout",
+      (event) => {
+        this.sendEvent(event, "mouseleave");
+      },
+      true
+    );
+
+    window.addEventListener("resize", (event) => {
+      this.sendEvent(event);
+    });
+    window.addEventListener(
+      "scroll",
+      (event) => {
+        this.sendEvent(event);
+      },
+      true
+    );
   }
-
-  const eventTypes = [
-    "click",
-    "mousedown",
-    "mouseup",
-    "dblclick",
-    "contextmenu",
-    "keydown",
-    "keypress",
-    "keyup",
-    "input",
-    "change",
-    "submit",
-    "focus",
-    "blur",
-    "focusin",
-    "focusout",
-    "dragstart",
-    "drag",
-    "dragend",
-    "dragenter",
-    "dragover",
-    "dragleave",
-    "drop",
-    "pointerdown",
-    "pointerup",
-    "pointermove",
-    "pointerenter",
-    "pointerleave",
-    "pointerover",
-    "pointerout",
-    "pointercancel",
-    "touchstart",
-    "touchmove",
-    "touchend",
-    "touchcancel",
-    "copy",
-    "cut",
-    "paste",
-    "compositionstart",
-    "compositionupdate",
-    "compositionend",
-    "beforeinput",
-    "selectionchange",
-    "reset",
-    "invalid",
-    "wheel",
-    "scroll",
-  ];
-  for (const eventType of eventTypes) {
-    document.addEventListener(eventType, sendEvent, true);
-  }
-
-  const debouncedSendMouseEvent = debounce(sendEvent, 250);
-  const mouseEventTypes = ["mouseover", "mouseout", "mousemove"];
-  for (const eventType of mouseEventTypes) {
-    const handler =
-      eventType === "mousemove" ? debouncedSendMouseEvent : sendEvent;
-    document.addEventListener(eventType, handler as EventListener, true);
-  }
-  document.addEventListener(
-    "mouseover",
-    (event) => {
-      sendEvent(event, "mouseenter");
-    },
-    true
-  );
-  document.addEventListener(
-    "mouseout",
-    (event) => {
-      sendEvent(event, "mouseleave");
-    },
-    true
-  );
-
-  window.addEventListener("resize", (event) => {
-    sendEvent(event);
-  });
-  window.addEventListener(
-    "scroll",
-    (event) => {
-      sendEvent(event);
-    },
-    true
-  );
-
-  const client: WebsocketDomClient = {
-    transport,
-    state,
-    resync,
-    close,
-    connect,
-  };
-
-  connect();
-
-  return client;
 }

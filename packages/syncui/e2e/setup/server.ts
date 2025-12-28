@@ -3,7 +3,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { WebsocketDOM } from "../../src";
+import { SyncUIServerSession } from "../../src";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";
 import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
 import { createPlaywrightAdapter } from "syncui-dom/adapter-server-playwright";
@@ -18,8 +18,8 @@ export class TestServer {
   private server: http.Server;
   private wss: WebSocketServer;
   private port: number;
-  private sessions = new Map<string, WebsocketDOM>();
-  private sessionPromises = new Map<string, Promise<WebsocketDOM>>();
+  private sessions = new Map<string, SyncUIServerSession>();
+  private sessionPromises = new Map<string, Promise<SyncUIServerSession>>();
   private playwrightPages = new Map<string, Page>();
   private playwrightBrowser: Browser | null = null;
   private baseDoc: string;
@@ -76,7 +76,7 @@ export class TestServer {
             ? await this.createPlaywrightAdapter(sessionId, url)
             : (document: string, options: { url: string }) =>
                 createJsdomAdapter(document, options, { JSDOM });
-        const session = new WebsocketDOM({
+        const session = new SyncUIServerSession({
           htmlDocument: this.baseDoc,
           url,
           adapter,

@@ -1,11 +1,13 @@
 # syncui-dom
 
-DOM adapters for SyncUI. Provides browser, JSDOM, and Playwright adapters.
+DOM adapters for SyncUI. Provides client DOM and server DOM adapters (JSDOM + Playwright).
 
 Install:
 ```bash
 npm i syncui-dom
 ```
+
+`jsdom` and `@playwright/test` are optional peer dependencies. Install the one you need for your server adapter.
 
 ## Client vs server adapters
 
@@ -26,12 +28,12 @@ import { createPlaywrightAdapter } from "syncui-dom/adapter-server-playwright";
 
 JSDOM adapter (server):
 ```ts
-import { WebsocketDOM } from "syncui";
+import { SyncUIServerSession } from "syncui";
 import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";
 import { JSDOM } from "jsdom";
 
-const wsDom = new WebsocketDOM({
+const wsDom = new SyncUIServerSession({
   htmlDocument: "<!doctype html><html><body></body></html>",
   url: "http://localhost:3000",
   adapter: (doc, options) => createJsdomAdapter(doc, options, { JSDOM }),

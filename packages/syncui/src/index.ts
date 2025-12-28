@@ -23,11 +23,11 @@ export { getXPath } from "./shared-utils";
 export { createWebSocketServerTransport } from "./transport/ws-server";
 export { createWebSocketClientTransport } from "./transport/ws-client";
 
-export type WebsocketDomEvents = {
+export type SyncUIServerSessionEvents = {
   clientEvent: (event: SerializedEvent) => void;
 };
 
-export type WebsocketDomOptions = {
+export type SyncUIServerSessionOptions = {
   htmlDocument: string;
   url: string;
   adapter?: UiAdapterFactory;
@@ -45,9 +45,9 @@ type ConnectionState = {
   closeUnsubscribe: () => void;
 };
 
-export class WebsocketDOM {
+export class SyncUIServerSession {
   private readonly dom: UiAdapter;
-  private readonly publicEmitter: TypedEmitter<WebsocketDomEvents>;
+  private readonly publicEmitter: TypedEmitter<SyncUIServerSessionEvents>;
   private readonly connections = new Map<
     TransportConnection,
     ConnectionState
@@ -55,16 +55,17 @@ export class WebsocketDOM {
 
   public readonly worker: UiAdapter["worker"];
 
-  constructor(options: WebsocketDomOptions) {
+  constructor(options: SyncUIServerSessionOptions) {
     const { htmlDocument, url, adapter } = options;
     if (!adapter) {
       throw new Error(
-        "WebsocketDOM requires an adapter. Install syncui-dom and pass adapter."
+        "SyncUIServerSession requires an adapter. Install syncui-dom and pass adapter."
       );
     }
     this.dom = adapter(htmlDocument, { url });
     this.worker = this.dom.worker;
-    this.publicEmitter = new EventEmitter() as TypedEmitter<WebsocketDomEvents>;
+    this.publicEmitter =
+      new EventEmitter() as TypedEmitter<SyncUIServerSessionEvents>;
 
     this.dom.emitter.on("instruction", (instruction: Serialized) => {
       for (const connection of this.connections.values()) {

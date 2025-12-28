@@ -1,4 +1,4 @@
-export { WebsocketDOM, createWebSocketServerTransport } from "syncui";
+export { SyncUIServerSession, createWebSocketServerTransport } from "syncui";
 export {
   createJsdomAdapter,
   type JsdomAdapterDeps,
