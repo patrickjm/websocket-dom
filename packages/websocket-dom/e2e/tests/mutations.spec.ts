@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { importScript } from '../setup/import-script';
+import { test, expect } from "@playwright/test";
+import { importScript } from "../setup/import-script";
 
 const mutationScript = `
 const container = document.createElement('div');
@@ -96,88 +96,121 @@ document.title = 'Server Title';
 document.body.setAttribute('data-state', 'server');
 `;
 
-test('should sync insertBefore/replaceChild/removeAttribute/classList/style mutations', async ({ page }) => {
-  await page.goto('/');
+const innerTextScript = `
+const node = document.createElement('div');
+node.id = 'inner-text';
+node.innerText = 'first';
+document.body.appendChild(node);
+node.innerText = 'second';
+`;
+
+test("should sync insertBefore/replaceChild/removeAttribute/classList/style mutations", async ({
+  page,
+}) => {
+  await page.goto("/");
   await importScript(page, mutationScript);
 
-  const container = page.locator('#mutation-container');
+  const container = page.locator("#mutation-container");
   await expect(container).toBeVisible();
-  await expect(container.locator(':scope > *')).toHaveCount(5);
+  await expect(container.locator(":scope > *")).toHaveCount(5);
 
-  await expect(page.locator('#replacement')).toHaveText('replacement');
-  await expect(page.locator('#second')).toHaveText('second');
-  await expect(page.locator('#third')).toHaveText('third');
+  await expect(page.locator("#replacement")).toHaveText("replacement");
+  await expect(page.locator("#second")).toHaveText("second");
+  await expect(page.locator("#third")).toHaveText("third");
 
-  await expect(page.locator('#third')).not.toHaveAttribute('data-tag');
-  await expect(page.locator('#third')).toHaveClass(/alpha/);
-  await expect(page.locator('#third')).not.toHaveClass(/beta/);
+  await expect(page.locator("#third")).not.toHaveAttribute("data-tag");
+  await expect(page.locator("#third")).toHaveClass(/alpha/);
+  await expect(page.locator("#third")).not.toHaveClass(/beta/);
 
-  await expect(page.locator('#third')).toHaveCSS('color', 'rgb(255, 0, 0)');
-  await expect(page.locator('#third')).not.toHaveCSS('background-color', 'rgb(0, 0, 0)');
+  await expect(page.locator("#third")).toHaveCSS("color", "rgb(255, 0, 0)");
+  await expect(page.locator("#third")).not.toHaveCSS(
+    "background-color",
+    "rgb(0, 0, 0)"
+  );
 
-  await expect(page.locator('#frag-1')).toHaveText('frag-one');
-  await expect(page.locator('#frag-2')).toHaveText('frag-two');
+  await expect(page.locator("#frag-1")).toHaveText("frag-one");
+  await expect(page.locator("#frag-2")).toHaveText("frag-two");
 });
 
-test('should sync initial head/body/html state without scripts', async ({ page }) => {
-  await page.goto('/');
+test("should sync initial head/body/html state without scripts", async ({
+  page,
+}) => {
+  await page.goto("/");
 
   await page.waitForFunction(() => {
     const ws = (window as any).ws as WebSocket | undefined;
     return !!ws && ws.readyState === WebSocket.OPEN;
   });
   await page.waitForFunction(() => {
-    const title = document.head?.querySelector('title');
-    return title?.textContent === 'Initial Title';
+    const title = document.head?.querySelector("title");
+    return title?.textContent === "Initial Title";
   });
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.locator('html')).toHaveAttribute('data-app', 'wsdom');
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'initial');
-  await expect(page.locator('meta[charset=\"utf-8\"]')).toHaveCount(1);
-  await expect(page.locator('#init-script')).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.locator("html")).toHaveAttribute("data-app", "wsdom");
+  await expect(page.locator("body")).toHaveAttribute("data-state", "initial");
+  await expect(page.locator('meta[charset="utf-8"]')).toHaveCount(1);
+  await expect(page.locator("#init-script")).toHaveCount(0);
 });
 
-test('should resync snapshot on demand', async ({ page }) => {
-  await page.goto('/');
+test("should resync snapshot on demand", async ({ page }) => {
+  await page.goto("/");
   await importScript(page, resyncScript);
 
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'server');
+  await expect(page.locator("body")).toHaveAttribute("data-state", "server");
 
   await page.evaluate(() => {
-    document.title = 'Client Title';
-    document.body.setAttribute('data-state', 'client');
+    document.title = "Client Title";
+    document.body.setAttribute("data-state", "client");
     const ws = (window as any).ws as WebSocket;
-    ws.send(JSON.stringify({ type: 'resync' }));
+    ws.send(JSON.stringify({ type: "resync" }));
   });
 
-  await page.waitForFunction(() => document.title === 'Server Title');
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'server');
+  await page.waitForFunction(() => document.title === "Server Title");
+  await expect(page.locator("body")).toHaveAttribute("data-state", "server");
 });
 
-test('should preserve node identity across detach and reparent', async ({ page }) => {
-  await page.goto('/');
+test("should sync innerText updates", async ({ page }) => {
+  await page.goto("/");
+  await importScript(page, innerTextScript);
+
+  await expect(page.locator("#inner-text")).toHaveText("second");
+});
+
+test("should preserve node identity across detach and reparent", async ({
+  page,
+}) => {
+  await page.goto("/");
   await importScript(page, identityScript);
 
-  await expect(page.locator('#moving')).toHaveText('detached');
-  await expect(page.locator('#moving')).toHaveAttribute('data-detached', 'yes');
-  await expect(page.locator('#identity-container #moving')).toBeVisible();
+  await expect(page.locator("#moving")).toHaveText("detached");
+  await expect(page.locator("#moving")).toHaveAttribute("data-detached", "yes");
+  await expect(page.locator("#identity-container #moving")).toBeVisible();
 });
 
-test('should blacklist obvious executable content from sync', async ({ page }) => {
-  await page.goto('/');
+test("should blacklist obvious executable content from sync", async ({
+  page,
+}) => {
+  await page.goto("/");
   await importScript(page, blacklistScript);
 
-  await expect(page.locator('#blacklist-container')).toBeVisible();
-  await expect(page.locator('#blacklist-link')).toHaveText('link');
-  await expect(page.locator('#blacklist-link')).not.toHaveAttribute('onclick');
-  await expect(page.locator('#blacklist-link')).not.toHaveAttribute('href', /javascript:/i);
+  await expect(page.locator("#blacklist-container")).toBeVisible();
+  await expect(page.locator("#blacklist-link")).toHaveText("link");
+  await expect(page.locator("#blacklist-link")).not.toHaveAttribute("onclick");
+  await expect(page.locator("#blacklist-link")).not.toHaveAttribute(
+    "href",
+    /javascript:/i
+  );
 
-  await expect(page.locator('#blocked-script')).toHaveCount(0);
-  await expect(page.locator('#html-script')).toHaveCount(0);
-  await expect(page.locator('#html-safe')).toHaveCount(0);
+  await expect(page.locator("#blocked-script")).toHaveCount(0);
+  await expect(page.locator("#html-script")).toHaveCount(0);
+  await expect(page.locator("#html-safe")).toHaveCount(0);
 
-  const scriptRan = await page.evaluate(() => document.body.dataset.scriptRan || '');
-  const htmlScriptRan = await page.evaluate(() => document.body.dataset.htmlScriptRan || '');
-  expect(scriptRan).toBe('');
-  expect(htmlScriptRan).toBe('');
+  const scriptRan = await page.evaluate(
+    () => document.body.dataset.scriptRan || ""
+  );
+  const htmlScriptRan = await page.evaluate(
+    () => document.body.dataset.htmlScriptRan || ""
+  );
+  expect(scriptRan).toBe("");
+  expect(htmlScriptRan).toBe("");
 });

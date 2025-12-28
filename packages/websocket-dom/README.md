@@ -37,7 +37,7 @@ document.body.appendChild(btn);
 Then set up the server (assuming you're using Express):
 
 ```ts
-import { createWebsocketDom } from 'websocket-dom';
+import { WebsocketDOM } from 'websocket-dom';
 import http from 'http';
 import express from 'express';
 import { WebSocketServer } from 'ws';
@@ -52,15 +52,19 @@ const __dirname = path.dirname(new URL(import.meta.url).pathname);
 wss.on('connection', (ws) => {
   // pass the websocket and the initial document
   const doc = '<!DOCTYPE html><html><body></body></html>';
-  const { domImport, terminate } = createWebsocketDom(ws, doc, { url: 'http://localhost:3000' });
+  const wsDom = new WebsocketDOM({
+    websocket: ws,
+    htmlDocument: doc,
+    url: 'http://localhost:3000'
+  });
 
   ws.on('close', () => {
-    terminate();
+    wsDom.terminate();
   });
 
   // This must be a relative path to the compiled worker.js file in the dist folder,
   // NOT the typescript file.
-  domImport(path.join(__dirname.replace('src', 'dist'), 'worker.js'));
+  wsDom.domImport(path.join(__dirname.replace('src', 'dist'), 'worker.js'));
 });
 
 server.listen(3000, () => {
@@ -68,7 +72,7 @@ server.listen(3000, () => {
 });
 ```
 
-Next we need to set up the client code that actually runs in the browser. This will require a bundler. It will automatically create a websocket connection, watch for client-side events, and update the DOM from backend mutations:
+Next we need to set up the client code that actually runs in the browser. This will require a bundler. It will automatically create a websocket connection, watch for client-side events, and update the DOM from backend instructions:
 
 ```ts
 import { createClient } from "websocket-dom/client";

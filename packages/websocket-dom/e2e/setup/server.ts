@@ -1,9 +1,9 @@
-import express from 'express';
-import http from 'http';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { WebSocketServer } from 'ws';
-import { createWebsocketDom } from '../../src';
+import express from "express";
+import http from "http";
+import path from "path";
+import { fileURLToPath } from "url";
+import { WebSocketServer } from "ws";
+import { WebsocketDOM } from "../../src";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,23 +19,28 @@ export class TestServer {
     this.wss = new WebSocketServer({ server: this.server });
     this.port = 3333;
 
-    this.wss.on('connection', (ws) => {
-      const doc = '<!DOCTYPE html><html lang="en" data-app="wsdom"><head><meta charset="utf-8"><title>Initial Title</title><script id="init-script">window.__initScript = true;</script></head><body data-state="initial"></body></html>';
-      const { domImport, terminate } = createWebsocketDom(ws, doc, `http://localhost:${this.port}`);
+    this.wss.on("connection", (ws) => {
+      const doc =
+        '<!DOCTYPE html><html lang="en" data-app="wsdom"><head><meta charset="utf-8"><title>Initial Title</title><script id="init-script">window.__initScript = true;</script></head><body data-state="initial"></body></html>';
+      const wsDom = new WebsocketDOM({
+        websocket: ws,
+        htmlDocument: doc,
+        url: `http://localhost:${this.port}`,
+      });
 
-      ws.on('message', (data) => {
+      ws.on("message", (data) => {
         const message = JSON.parse(data.toString());
-        if (message.type === 'e2e-import') {
-          domImport(message.path);
+        if (message.type === "e2e-import") {
+          wsDom.domImport(message.path);
         }
       });
 
-      ws.on('close', () => {
-        terminate();
+      ws.on("close", () => {
+        wsDom.terminate();
       });
     });
 
-    this.app.use(express.static(path.join(__dirname, '../dist')));
+    this.app.use(express.static(path.join(__dirname, "../dist")));
   }
 
   async start() {

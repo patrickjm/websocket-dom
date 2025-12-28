@@ -12,13 +12,17 @@ yarn add react-websocket-dom
 
 ## Usage
 
-`loadReactWebsocketDOM` expects a small adapter with `import`, `on`, and `postWorkerMessage` methods. You can build one from `createWebsocketDom` like this:
+`loadReactWebsocketDOM` expects a small adapter with `import`, `on`, and `postWorkerMessage` methods. You can build one from `WebsocketDOM` like this:
 
 ```ts
-import { createWebsocketDom } from "websocket-dom";
+import { WebsocketDOM } from "websocket-dom";
 import { loadReactWebsocketDOM } from "react-websocket-dom";
 
-const wsDom = createWebsocketDom(ws, doc, url);
+const wsDom = new WebsocketDOM({
+  websocket: ws,
+  htmlDocument: doc,
+  url,
+});
 
 loadReactWebsocketDOM({
   import: wsDom.domImport,

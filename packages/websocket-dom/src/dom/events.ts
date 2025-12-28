@@ -1,124 +1,201 @@
-import type { DOMWindow } from 'jsdom';
-import { type SerializedChangeEvent, type SerializedClickEvent, type SerializedDragEvent, type SerializedEvent, type SerializedFocusEvent, type SerializedInputEvent, type SerializedKeyboardEvent, type SerializedMouseButtonEvent, type SerializedMouseEvent, type SerializedSubmitEvent, type SerializedWheelEvent } from '../client/types';
+import type { DOMWindow } from "jsdom";
+import {
+  type SerializedChangeEvent,
+  type SerializedClickEvent,
+  type SerializedDragEvent,
+  type SerializedEvent,
+  type SerializedFocusEvent,
+  type SerializedInputEvent,
+  type SerializedKeyboardEvent,
+  type SerializedMouseButtonEvent,
+  type SerializedMouseEvent,
+  type SerializedSubmitEvent,
+  type SerializedWheelEvent,
+} from "../client/types";
 import { type XPath } from "../shared-utils";
-import type { NodeStash } from './nodes';
-import type { DomEmitter } from './instructions';
-import { withSuppressedTarget } from './suppress';
+import type { NodeStash } from "./nodes";
+import type { DomEmitter } from "./instructions";
+import { withSuppressedTarget } from "./suppress";
 
 type DispatchTarget = HTMLElement | Document | Window | DOMWindow;
 
-export function dispatchEvent(nodes: NodeStash, emitter: DomEmitter, window: DOMWindow, event: SerializedEvent) {
+export function dispatchEvent(
+  nodes: NodeStash,
+  emitter: DomEmitter,
+  window: DOMWindow,
+  event: SerializedEvent
+) {
   const [targetElement, dispatchedEvent] = deserializeEvent(window, event);
   if (!targetElement || !dispatchedEvent) {
     return;
   }
-  if (event.type === 'input' || event.type === 'change') {
+  if (event.type === "input" || event.type === "change") {
     applyInputValue(window, targetElement, event.value);
   }
   if (dispatchedEvent) {
     targetElement.dispatchEvent(dispatchedEvent);
   }
+  if (event.type === "keydown") {
+    simulateKeyboardInput(window, targetElement, event);
+  }
 }
 
-function deserializeEvent(window: DOMWindow, event: SerializedEvent): [DispatchTarget | null, Event | null] {
-  const targetElement = event.target ? getElementFromXPath(event.target, window.document) : null;
+function deserializeEvent(
+  window: DOMWindow,
+  event: SerializedEvent
+): [DispatchTarget | null, Event | null] {
+  const targetElement = event.target
+    ? getElementFromXPath(event.target, window.document)
+    : null;
   const fallbackTarget = getFallbackTarget(window, event.type);
 
   switch (event.type) {
-    case 'click':
-      return [targetElement ?? fallbackTarget, deserializeClickEvent(event, window)];
-    case 'mousedown':
-    case 'mouseup':
-    case 'dblclick':
-    case 'contextmenu':
-      return [targetElement ?? fallbackTarget, deserializeMouseButtonEvent(event, window)];
-    case 'keydown':
-    case 'keyup':
-    case 'keypress':
-      return [targetElement ?? fallbackTarget, deserializeKeyboardEvent(event, window)];
-    case 'focus':
-    case 'blur':
-    case 'focusin':
-    case 'focusout':
-      return [targetElement ?? fallbackTarget, deserializeFocusEvent(event, window)];
-    case 'change':
+    case "click":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeClickEvent(event, window),
+      ];
+    case "mousedown":
+    case "mouseup":
+    case "dblclick":
+    case "contextmenu":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeMouseButtonEvent(event, window),
+      ];
+    case "keydown":
+    case "keyup":
+    case "keypress":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeKeyboardEvent(event, window),
+      ];
+    case "focus":
+    case "blur":
+    case "focusin":
+    case "focusout":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeFocusEvent(event, window),
+      ];
+    case "change":
       const changeEvent = deserializeChangeEvent(event, window);
       return [targetElement ?? fallbackTarget, changeEvent];
-    case 'input':
+    case "input":
       const inputEvent = deserializeInputEvent(event, window);
       return [targetElement ?? fallbackTarget, inputEvent];
-    case 'submit':
-      return [targetElement ?? fallbackTarget, deserializeSubmitEvent(event, window)];
-    case 'wheel':
-      return [targetElement ?? fallbackTarget, deserializeWheelEvent(event, window)];
-    case 'pointerdown':
-    case 'pointerup':
-    case 'pointermove':
-    case 'pointerenter':
-    case 'pointerleave':
-    case 'pointerover':
-    case 'pointerout':
-    case 'pointercancel':
-      return [targetElement ?? fallbackTarget, deserializePointerEvent(event, window)];
-    case 'touchstart':
-    case 'touchmove':
-    case 'touchend':
-    case 'touchcancel':
-      return [targetElement ?? fallbackTarget, deserializeTouchEvent(event, window)];
-    case 'copy':
-    case 'cut':
-    case 'paste':
-      return [targetElement ?? fallbackTarget, deserializeClipboardEvent(event, window)];
-    case 'compositionstart':
-    case 'compositionupdate':
-    case 'compositionend':
-      return [targetElement ?? fallbackTarget, deserializeCompositionEvent(event, window)];
-    case 'beforeinput':
-      return [targetElement ?? fallbackTarget, deserializeBeforeInputEvent(event, window)];
-    case 'selectionchange':
+    case "submit":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeSubmitEvent(event, window),
+      ];
+    case "wheel":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeWheelEvent(event, window),
+      ];
+    case "pointerdown":
+    case "pointerup":
+    case "pointermove":
+    case "pointerenter":
+    case "pointerleave":
+    case "pointerover":
+    case "pointerout":
+    case "pointercancel":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializePointerEvent(event, window),
+      ];
+    case "touchstart":
+    case "touchmove":
+    case "touchend":
+    case "touchcancel":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeTouchEvent(event, window),
+      ];
+    case "copy":
+    case "cut":
+    case "paste":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeClipboardEvent(event, window),
+      ];
+    case "compositionstart":
+    case "compositionupdate":
+    case "compositionend":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeCompositionEvent(event, window),
+      ];
+    case "beforeinput":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeBeforeInputEvent(event, window),
+      ];
+    case "selectionchange":
       return [fallbackTarget, deserializeDefaultEvent(event, window)];
-    case 'scroll':
-    case 'resize':
+    case "scroll":
+    case "resize":
       return [fallbackTarget, deserializeDefaultEvent(event, window)];
-    case 'reset':
-    case 'invalid':
-      return [targetElement ?? fallbackTarget, deserializeDefaultEvent(event, window)];
-    case 'mouseenter':
-    case 'mouseleave':
-    case 'mousemove':
-    case 'mouseout':
-    case 'mouseover':
-      return [targetElement ?? fallbackTarget, deserializeMouseEvent(event, window)];
-    case 'dragstart':
-    case 'drag':
-    case 'dragend':
-    case 'dragenter':
-    case 'dragover':
-    case 'dragleave':
-    case 'drop':
-      return [targetElement ?? fallbackTarget, deserializeDragEvent(event, window)];
+    case "reset":
+    case "invalid":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeDefaultEvent(event, window),
+      ];
+    case "mouseenter":
+    case "mouseleave":
+    case "mousemove":
+    case "mouseout":
+    case "mouseover":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeMouseEvent(event, window),
+      ];
+    case "dragstart":
+    case "drag":
+    case "dragend":
+    case "dragenter":
+    case "dragover":
+    case "dragleave":
+    case "drop":
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeDragEvent(event, window),
+      ];
     default:
       console.warn(`Unhandled event type: ${(event as SerializedEvent).type}`);
-      return [targetElement ?? fallbackTarget, deserializeDefaultEvent(event, window)];
+      return [
+        targetElement ?? fallbackTarget,
+        deserializeDefaultEvent(event, window),
+      ];
   }
 }
 
-export function getElementFromXPath(xpath: XPath, document: Document): HTMLElement | null {
-  if (xpath === '/html') {
+export function getElementFromXPath(
+  xpath: XPath,
+  document: Document
+): HTMLElement | null {
+  if (xpath === "/html") {
     return document.documentElement;
   }
-  if (xpath === '/html/head') {
+  if (xpath === "/html/head") {
     return document.head;
   }
-  if (xpath === '/html/body') {
+  if (xpath === "/html/body") {
     return document.body;
   }
   const FIRST_ORDERED_NODE_TYPE = 9;
-  return document.evaluate(xpath, document, null, FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as HTMLElement;
+  return document.evaluate(xpath, document, null, FIRST_ORDERED_NODE_TYPE, null)
+    .singleNodeValue as HTMLElement;
 }
 
-function deserializeClickEvent(event: SerializedClickEvent, window: DOMWindow): MouseEvent {
-  return new window.MouseEvent('click', {
+function deserializeClickEvent(
+  event: SerializedClickEvent,
+  window: DOMWindow
+): MouseEvent {
+  return new window.MouseEvent("click", {
     bubbles: true,
     cancelable: true,
     view: window as any,
@@ -133,7 +210,10 @@ function deserializeClickEvent(event: SerializedClickEvent, window: DOMWindow): 
   });
 }
 
-function deserializeMouseButtonEvent(event: SerializedMouseButtonEvent, window: DOMWindow): MouseEvent {
+function deserializeMouseButtonEvent(
+  event: SerializedMouseButtonEvent,
+  window: DOMWindow
+): MouseEvent {
   return new window.MouseEvent(event.type, {
     bubbles: true,
     cancelable: true,
@@ -149,7 +229,10 @@ function deserializeMouseButtonEvent(event: SerializedMouseButtonEvent, window: 
   });
 }
 
-function deserializeKeyboardEvent(event: SerializedKeyboardEvent, window: DOMWindow): KeyboardEvent {
+function deserializeKeyboardEvent(
+  event: SerializedKeyboardEvent,
+  window: DOMWindow
+): KeyboardEvent {
   return new window.KeyboardEvent(event.type, {
     bubbles: true,
     cancelable: true,
@@ -168,7 +251,10 @@ function deserializeKeyboardEvent(event: SerializedKeyboardEvent, window: DOMWin
   });
 }
 
-function deserializeFocusEvent(event: SerializedFocusEvent, window: DOMWindow): FocusEvent {
+function deserializeFocusEvent(
+  event: SerializedFocusEvent,
+  window: DOMWindow
+): FocusEvent {
   return new window.FocusEvent(event.type, {
     bubbles: true,
     cancelable: false,
@@ -177,16 +263,22 @@ function deserializeFocusEvent(event: SerializedFocusEvent, window: DOMWindow): 
   });
 }
 
-function deserializeChangeEvent(event: SerializedChangeEvent, window: DOMWindow): Event {
-  const changeEvent = new window.Event('change', {
+function deserializeChangeEvent(
+  event: SerializedChangeEvent,
+  window: DOMWindow
+): Event {
+  const changeEvent = new window.Event("change", {
     bubbles: true,
     cancelable: true,
   });
   return changeEvent;
 }
 
-function deserializeInputEvent(event: SerializedInputEvent, window: DOMWindow): InputEvent {
-  const inputEvent = new window.InputEvent('input', {
+function deserializeInputEvent(
+  event: SerializedInputEvent,
+  window: DOMWindow
+): InputEvent {
+  const inputEvent = new window.InputEvent("input", {
     bubbles: true,
     cancelable: true,
     inputType: event.inputType,
@@ -196,14 +288,20 @@ function deserializeInputEvent(event: SerializedInputEvent, window: DOMWindow): 
   return inputEvent;
 }
 
-function deserializeSubmitEvent(event: SerializedSubmitEvent, window: DOMWindow): SubmitEvent {
-  return new window.SubmitEvent('submit', {
+function deserializeSubmitEvent(
+  event: SerializedSubmitEvent,
+  window: DOMWindow
+): SubmitEvent {
+  return new window.SubmitEvent("submit", {
     bubbles: true,
     cancelable: true,
   });
 }
 
-function deserializeMouseEvent(event: SerializedMouseEvent, window: DOMWindow): MouseEvent {
+function deserializeMouseEvent(
+  event: SerializedMouseEvent,
+  window: DOMWindow
+): MouseEvent {
   return new window.MouseEvent(event.type, {
     bubbles: true,
     cancelable: true,
@@ -223,8 +321,11 @@ function deserializeMouseEvent(event: SerializedMouseEvent, window: DOMWindow): 
   });
 }
 
-function deserializeDragEvent(event: SerializedDragEvent, window: DOMWindow): Event {
-  if (typeof (window as any).DragEvent === 'function') {
+function deserializeDragEvent(
+  event: SerializedDragEvent,
+  window: DOMWindow
+): Event {
+  if (typeof (window as any).DragEvent === "function") {
     return new (window as any).DragEvent(event.type, {
       bubbles: true,
       cancelable: true,
@@ -254,9 +355,12 @@ function deserializeDragEvent(event: SerializedDragEvent, window: DOMWindow): Ev
   });
 }
 
-function deserializeWheelEvent(event: SerializedWheelEvent, window: DOMWindow): Event {
-  if (typeof window.WheelEvent === 'function') {
-    return new window.WheelEvent('wheel', {
+function deserializeWheelEvent(
+  event: SerializedWheelEvent,
+  window: DOMWindow
+): Event {
+  if (typeof window.WheelEvent === "function") {
+    return new window.WheelEvent("wheel", {
       bubbles: true,
       cancelable: true,
       deltaX: event.deltaX,
@@ -274,8 +378,11 @@ function deserializeWheelEvent(event: SerializedWheelEvent, window: DOMWindow): 
   return deserializeDefaultEvent(event, window);
 }
 
-function deserializePointerEvent(event: SerializedEvent, window: DOMWindow): Event {
-  if (typeof (window as any).PointerEvent === 'function') {
+function deserializePointerEvent(
+  event: SerializedEvent,
+  window: DOMWindow
+): Event {
+  if (typeof (window as any).PointerEvent === "function") {
     return new (window as any).PointerEvent(event.type, {
       bubbles: true,
       cancelable: true,
@@ -285,8 +392,11 @@ function deserializePointerEvent(event: SerializedEvent, window: DOMWindow): Eve
   return deserializeDefaultEvent(event, window);
 }
 
-function deserializeTouchEvent(event: SerializedEvent, window: DOMWindow): Event {
-  if (typeof (window as any).TouchEvent === 'function') {
+function deserializeTouchEvent(
+  event: SerializedEvent,
+  window: DOMWindow
+): Event {
+  if (typeof (window as any).TouchEvent === "function") {
     return new (window as any).TouchEvent(event.type, {
       bubbles: true,
       cancelable: true,
@@ -295,8 +405,11 @@ function deserializeTouchEvent(event: SerializedEvent, window: DOMWindow): Event
   return deserializeDefaultEvent(event, window);
 }
 
-function deserializeClipboardEvent(event: SerializedEvent, window: DOMWindow): Event {
-  if (typeof (window as any).ClipboardEvent === 'function') {
+function deserializeClipboardEvent(
+  event: SerializedEvent,
+  window: DOMWindow
+): Event {
+  if (typeof (window as any).ClipboardEvent === "function") {
     return new (window as any).ClipboardEvent(event.type, {
       bubbles: true,
       cancelable: true,
@@ -305,8 +418,11 @@ function deserializeClipboardEvent(event: SerializedEvent, window: DOMWindow): E
   return deserializeDefaultEvent(event, window);
 }
 
-function deserializeCompositionEvent(event: SerializedEvent, window: DOMWindow): Event {
-  if (typeof (window as any).CompositionEvent === 'function') {
+function deserializeCompositionEvent(
+  event: SerializedEvent,
+  window: DOMWindow
+): Event {
+  if (typeof (window as any).CompositionEvent === "function") {
     return new (window as any).CompositionEvent(event.type, {
       bubbles: true,
       cancelable: true,
@@ -316,46 +432,175 @@ function deserializeCompositionEvent(event: SerializedEvent, window: DOMWindow):
   return deserializeDefaultEvent(event, window);
 }
 
-function deserializeBeforeInputEvent(event: SerializedEvent, window: DOMWindow): Event {
-  if (typeof (window as any).InputEvent === 'function') {
-    return new window.InputEvent('beforeinput', {
+function deserializeBeforeInputEvent(
+  event: SerializedEvent,
+  window: DOMWindow
+): Event {
+  if (typeof (window as any).InputEvent === "function") {
+    return new window.InputEvent("beforeinput", {
       bubbles: true,
       cancelable: true,
-      inputType: 'insertText',
+      inputType: "insertText",
       data: null,
     });
   }
   return deserializeDefaultEvent(event, window);
 }
 
-function deserializeDefaultEvent(event: SerializedEvent, window: DOMWindow): Event {
+function deserializeDefaultEvent(
+  event: SerializedEvent,
+  window: DOMWindow
+): Event {
   return new window.Event(event.type, {
     bubbles: true,
     cancelable: true,
   });
 }
 
-function isTextInputElement(window: DOMWindow, element: EventTarget): element is HTMLInputElement | HTMLTextAreaElement {
-  return element instanceof window.HTMLInputElement || element instanceof window.HTMLTextAreaElement;
+function isTextInputElement(
+  window: DOMWindow,
+  element: EventTarget
+): element is HTMLInputElement | HTMLTextAreaElement {
+  return (
+    element instanceof window.HTMLInputElement ||
+    element instanceof window.HTMLTextAreaElement
+  );
 }
 
-function applyInputValue(window: DOMWindow, element: EventTarget, value: string) {
-  withSuppressedTarget(element, () => {
+function applyInputValue(
+  window: DOMWindow,
+  element: EventTarget,
+  value: string,
+  options: { suppress?: boolean } = {}
+) {
+  const { suppress = true } = options;
+  const apply = () => {
     if (isTextInputElement(window, element)) {
       element.value = value;
-    } else if (element instanceof window.HTMLElement && (element.isContentEditable || element.getAttribute('contenteditable') !== null)) {
+    } else if (
+      element instanceof window.HTMLElement &&
+      (element.isContentEditable ||
+        element.getAttribute("contenteditable") !== null)
+    ) {
       element.textContent = value;
-    } else if (element && 'value' in element) {
+    } else if (element && "value" in element) {
       (element as HTMLInputElement).value = value;
     }
-  });
+  };
+  if (suppress) {
+    withSuppressedTarget(element, apply);
+    return;
+  }
+  apply();
+}
+
+function simulateKeyboardInput(
+  window: DOMWindow,
+  element: EventTarget,
+  event: SerializedEvent
+) {
+  if (!isTextInputElement(window, element)) {
+    return;
+  }
+  if (event.type !== "keydown") {
+    return;
+  }
+  if (!isSimulatedEvent(event)) {
+    return;
+  }
+  if (!("key" in event)) {
+    return;
+  }
+  const key = event.key;
+  if (typeof key !== "string") {
+    return;
+  }
+  const value = element.value;
+  const selectionStart = element.selectionStart ?? value.length;
+  const selectionEnd = element.selectionEnd ?? value.length;
+  let nextValue = value;
+  let nextCaret = selectionStart;
+  let inputType: string | null = null;
+
+  if (key === "Backspace") {
+    if (selectionStart !== selectionEnd) {
+      nextValue = value.slice(0, selectionStart) + value.slice(selectionEnd);
+      nextCaret = selectionStart;
+    } else if (selectionStart > 0) {
+      nextValue =
+        value.slice(0, selectionStart - 1) + value.slice(selectionEnd);
+      nextCaret = selectionStart - 1;
+    } else {
+      return;
+    }
+    inputType = "deleteContentBackward";
+  } else if (key === "Delete") {
+    if (selectionStart !== selectionEnd) {
+      nextValue = value.slice(0, selectionStart) + value.slice(selectionEnd);
+      nextCaret = selectionStart;
+    } else if (selectionStart < value.length) {
+      nextValue =
+        value.slice(0, selectionStart) + value.slice(selectionStart + 1);
+      nextCaret = selectionStart;
+    } else {
+      return;
+    }
+    inputType = "deleteContentForward";
+  } else if (key === "Enter") {
+    if (element instanceof window.HTMLTextAreaElement) {
+      nextValue =
+        value.slice(0, selectionStart) + "\n" + value.slice(selectionEnd);
+      nextCaret = selectionStart + 1;
+      inputType = "insertLineBreak";
+    }
+  } else if (key.length === 1) {
+    nextValue =
+      value.slice(0, selectionStart) + key + value.slice(selectionEnd);
+    nextCaret = selectionStart + 1;
+    inputType = "insertText";
+  } else {
+    return;
+  }
+
+  if (nextValue !== value) {
+    applyInputValue(window, element, nextValue, { suppress: false });
+    if (typeof element.setSelectionRange === "function") {
+      element.setSelectionRange(nextCaret, nextCaret);
+    }
+  }
+
+  if (inputType) {
+    const inputEvent = new window.InputEvent("input", {
+      bubbles: true,
+      cancelable: true,
+      inputType,
+      data: key.length === 1 ? key : null,
+      isComposing: false,
+    });
+    element.dispatchEvent(inputEvent);
+  }
+
+  if (key === "Enter") {
+    const changeEvent = new window.Event("change", {
+      bubbles: true,
+      cancelable: true,
+    });
+    element.dispatchEvent(changeEvent);
+  }
+}
+
+function isSimulatedEvent(event: SerializedEvent): boolean {
+  if (!("simulate" in event)) {
+    return false;
+  }
+  return Boolean((event as { simulate?: boolean }).simulate);
 }
 
 function getFallbackTarget(window: DOMWindow, type: string): DispatchTarget {
-  if (type === 'resize' || type === 'scroll') {
+  if (type === "resize" || type === "scroll") {
     return window;
   }
-  if (type === 'selectionchange') {
+  if (type === "selectionchange") {
     return window.document;
   }
   return window.document;
