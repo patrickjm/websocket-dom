@@ -1,23 +1,23 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
-  testDir: './e2e/tests',
+  testDir: "./e2e/tests",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'list',
+  reporter: "list",
   use: {
-    baseURL: 'http://localhost:3333',
+    baseURL: "http://localhost:3333",
     headless: true,
-    trace: 'on-first-retry',
+    trace: "on-first-retry",
   },
   webServer: {
-    command: 'yarn build && yarn build:e2e && yarn e2e:server',
-    url: 'http://localhost:3333',
+    command: "yarn build && yarn build:e2e && yarn e2e:server",
+    url: "http://localhost:3333",
     reuseExistingServer: !process.env.CI,
     timeout: 60000,
-    stdout: 'pipe',
-    stderr: 'pipe',
+    stdout: "ignore",
+    stderr: "ignore",
   },
 });

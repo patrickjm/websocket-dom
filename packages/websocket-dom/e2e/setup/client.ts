@@ -1,19 +1,16 @@
 import { createClient } from "../../src/client";
 
-const client = createClient('ws://localhost:3333');
-const { ws } = client;
+const params = new URLSearchParams(window.location.search);
+let sessionId = params.get("session");
+if (!sessionId) {
+  sessionId = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+}
+const wsUrl = `ws://localhost:3333?session=${encodeURIComponent(sessionId)}`;
+const client = createClient(wsUrl);
 
-ws.onopen = () => {
-  console.log('Connection opened');
-};
-
-ws.onerror = (error) => {
-  console.error('WebSocket error:', error);
-};
-
-ws.onclose = () => {
-  console.log('Connection closed');
-};
-
-(window as any).ws = ws;
+Object.defineProperty(window as any, "ws", {
+  get() {
+    return client.ws;
+  },
+});
 (window as any).wsdomClient = client;

@@ -24,42 +24,47 @@ export type WebsocketDomEvents = {
 };
 
 export type WebsocketDomOptions = {
-  websocket?: WebSocket | null;
   htmlDocument: string;
   url: string;
 };
 
+type ConnectionState = {
+  ws: WebSocket;
+  clientReady: boolean;
+  snapshotSent: boolean;
+  snapshotInFlight: Promise<void> | null;
+  pending: Serialized[];
+  batch: Serialized[];
+  flushTimer: ReturnType<typeof setTimeout> | null;
+  messageHandler: (buffer: Buffer) => void;
+  closeHandler: () => void;
+};
+
 export class WebsocketDOM {
-  private ws: WebSocket | null = null;
   private readonly dom: ReturnType<typeof createDom>;
   private readonly publicEmitter: TypedEmitter<WebsocketDomEvents>;
-  private readonly batch: { instructions: Serialized[] } = { instructions: [] };
-  private readonly pending: Serialized[] = [];
-  private clientReady = false;
-  private snapshotSent = false;
-  private snapshotInFlight: Promise<void> | null = null;
-  private wsMessageHandler?: (buffer: Buffer) => void;
+  private readonly connections = new Map<WebSocket, ConnectionState>();
 
   public readonly worker: ReturnType<typeof createDom>["worker"];
 
   constructor(options: WebsocketDomOptions) {
-    const { websocket, htmlDocument, url } = options;
+    const { htmlDocument, url } = options;
     this.dom = createDom(htmlDocument, { url });
     this.worker = this.dom.worker;
     this.publicEmitter = new EventEmitter() as TypedEmitter<WebsocketDomEvents>;
 
     this.dom.emitter.on("instruction", (instruction: Serialized) => {
-      if (!this.clientReady) {
-        this.pending.push(instruction);
-        return;
+      for (const connection of this.connections.values()) {
+        if (!connection.clientReady) {
+          connection.pending.push(instruction);
+          continue;
+        }
+        connection.batch.push(instruction);
+        if (connection.flushTimer === null) {
+          connection.flushTimer = setTimeout(() => this.flush(connection), 0);
+        }
       }
-      this.batch.instructions.push(instruction);
-      setTimeout(() => this.flush(), 0);
     });
-
-    if (websocket) {
-      this.setWebsocket(websocket);
-    }
   }
 
   get emitter() {
@@ -67,24 +72,50 @@ export class WebsocketDOM {
   }
 
   isConnected() {
-    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+    for (const connection of this.connections.values()) {
+      if (connection.ws.readyState === WebSocket.OPEN) {
+        return true;
+      }
+    }
+    return false;
   }
 
-  setWebsocket(ws: WebSocket | null) {
-    if (this.ws && this.wsMessageHandler) {
-      this.ws.off("message", this.wsMessageHandler);
-    }
-    this.ws = ws;
-    this.clientReady = false;
-    this.snapshotSent = false;
-    this.pending.splice(0, this.pending.length);
-    if (!ws) {
+  addConnection(ws: WebSocket) {
+    if (this.connections.has(ws)) {
       return;
     }
-    this.wsMessageHandler = (buffer: Buffer) => {
-      this.handleMessage(buffer);
+    const connection: ConnectionState = {
+      ws,
+      clientReady: false,
+      snapshotSent: false,
+      snapshotInFlight: null,
+      pending: [],
+      batch: [],
+      flushTimer: null,
+      messageHandler: (buffer: Buffer) => {
+        this.handleMessage(connection, buffer);
+      },
+      closeHandler: () => {
+        this.removeConnection(ws);
+      },
     };
-    ws.on("message", this.wsMessageHandler);
+
+    ws.on("message", connection.messageHandler);
+    ws.on("close", connection.closeHandler);
+    this.connections.set(ws, connection);
+  }
+
+  removeConnection(ws: WebSocket) {
+    const connection = this.connections.get(ws);
+    if (!connection) {
+      return;
+    }
+    ws.off("message", connection.messageHandler);
+    ws.off("close", connection.closeHandler);
+    if (connection.flushTimer !== null) {
+      clearTimeout(connection.flushTimer);
+    }
+    this.connections.delete(ws);
   }
 
   import(url: string) {
@@ -109,41 +140,54 @@ export class WebsocketDOM {
   }
 
   terminate(): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.close();
+    for (const connection of this.connections.values()) {
+      if (connection.ws.readyState === WebSocket.OPEN) {
+        connection.ws.close();
+      }
+      if (connection.flushTimer !== null) {
+        clearTimeout(connection.flushTimer);
+      }
     }
+    this.connections.clear();
     this.dom.terminate();
   }
 
-  private async sendSnapshot(force: boolean): Promise<void> {
-    if (!force && this.snapshotSent) {
-      return this.snapshotInFlight ?? Promise.resolve();
+  private async sendSnapshot(
+    connection: ConnectionState,
+    force: boolean
+  ): Promise<void> {
+    if (!force && connection.snapshotSent) {
+      return connection.snapshotInFlight ?? Promise.resolve();
     }
-    if (this.snapshotInFlight) {
-      return this.snapshotInFlight;
+    if (connection.snapshotInFlight) {
+      return connection.snapshotInFlight;
     }
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (connection.ws.readyState !== WebSocket.OPEN) {
       return Promise.resolve();
     }
     if (!force) {
-      this.snapshotSent = true;
+      connection.snapshotSent = true;
     }
-    this.snapshotInFlight = (async () => {
+    connection.snapshotInFlight = (async () => {
       const snapshot = await this.dom.getSnapshot();
-      this.ws?.send(JSON.stringify(snapshot));
+      connection.ws.send(JSON.stringify(snapshot));
     })().finally(() => {
-      this.snapshotInFlight = null;
+      connection.snapshotInFlight = null;
     });
-    return this.snapshotInFlight;
+    return connection.snapshotInFlight;
   }
 
-  private flush() {
-    if (this.batch.instructions.length === 0 || !this.ws) {
+  private flush(connection: ConnectionState) {
+    connection.flushTimer = null;
+    if (connection.batch.length === 0) {
       return;
     }
-    const instr = this.batch.instructions.slice();
-    this.batch.instructions = [];
-    this.ws.send(
+    if (connection.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    const instr = connection.batch.slice();
+    connection.batch = [];
+    connection.ws.send(
       JSON.stringify({
         type: "instructions",
         instructions: instr,
@@ -151,18 +195,18 @@ export class WebsocketDOM {
     );
   }
 
-  private handleMessage(buffer: Buffer) {
+  private handleMessage(connection: ConnectionState, buffer: Buffer) {
     const message = JSON.parse(buffer.toString()) as Message;
     if (message.type === "ready") {
-      if (this.clientReady) {
-        void this.sendSnapshot(false);
+      if (connection.clientReady) {
+        void this.sendSnapshot(connection, false);
         return;
       }
-      this.clientReady = true;
-      this.pending.splice(0, this.pending.length);
-      void this.sendSnapshot(false);
+      connection.clientReady = true;
+      connection.pending.splice(0, connection.pending.length);
+      void this.sendSnapshot(connection, false);
     } else if (message.type === "resync") {
-      void this.sendSnapshot(true);
+      void this.sendSnapshot(connection, true);
     } else if (message.type === "event") {
       this.dispatchEvent(message.event);
     }

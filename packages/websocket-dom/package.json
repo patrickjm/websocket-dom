@@ -26,7 +26,7 @@
     "clean": "touch ./dist && rm -r ./dist",
     "build": "yarn clean && yarn build:server && yarn build:client && yarn build:types",
     "e2e": "playwright test",
-    "e2e:server": "tsx --tsconfig e2e/tsconfig.json e2e/setup/start-server.ts",
+    "e2e:server": "node --import tsx e2e/setup/start-server.ts",
     "start": "vite build && tsx ./src/index.ts",
     "dev": "nodemon --watch src --watch vite.config.ts --watch index.html --watch public --ext ts,html,json,tsx --exec yarn start"
   },

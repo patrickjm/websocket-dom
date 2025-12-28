@@ -19,10 +19,11 @@ import { WebsocketDOM } from "websocket-dom";
 import { loadReactWebsocketDOM } from "react-websocket-dom";
 
 const wsDom = new WebsocketDOM({
-  websocket: ws,
   htmlDocument: doc,
   url,
 });
+
+wsDom.addConnection(ws);
 
 loadReactWebsocketDOM({
   import: wsDom.domImport,

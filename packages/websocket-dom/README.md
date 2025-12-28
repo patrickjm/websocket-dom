@@ -48,24 +48,19 @@ const wss = new WebSocketServer({ server });
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-// create a new websocket-dom for each connection
-wss.on('connection', (ws) => {
-  // pass the websocket and the initial document
-  const doc = '<!DOCTYPE html><html><body></body></html>';
-  const wsDom = new WebsocketDOM({
-    websocket: ws,
-    htmlDocument: doc,
-    url: 'http://localhost:3000'
-  });
-
-  ws.on('close', () => {
-    wsDom.terminate();
-  });
-
-  // This must be a relative path to the compiled worker.js file in the dist folder,
-  // NOT the typescript file.
-  wsDom.domImport(path.join(__dirname.replace('src', 'dist'), 'worker.js'));
+const doc = '<!DOCTYPE html><html><body></body></html>';
+const wsDom = new WebsocketDOM({
+  htmlDocument: doc,
+  url: 'http://localhost:3000'
 });
+
+wss.on('connection', (ws) => {
+  wsDom.addConnection(ws);
+});
+
+// This must be a relative path to the compiled worker.js file in the dist folder,
+// NOT the typescript file.
+wsDom.domImport(path.join(__dirname.replace('src', 'dist'), 'worker.js'));
 
 server.listen(3000, () => {
   console.log('Server is running on port 3000');
@@ -77,7 +72,15 @@ Next we need to set up the client code that actually runs in the browser. This w
 ```ts
 import { createClient } from "websocket-dom/client";
 
-export const { ws } = createClient('ws://localhost:3000');
+export const client = createClient("ws://localhost:3000", {
+  reconnect: {
+    enabled: true,
+    maxAttempts: 10,
+    baseDelayMs: 500,
+    maxDelayMs: 10000,
+    jitterRatio: 0.2,
+  },
+});
 ```
 
 ## How it works
@@ -91,9 +94,9 @@ To keep the two sides in sync, it's strongly recommended that the only client-si
 ## Open problems / todo
 - [ ] Manual flush / reset / sync
 - [ ] Comprehensive JSDOM api coverage
-- [ ] Multiple open connections on the same session
+- [x] Multiple open connections on the same session
 - [ ] Event side effects (Input event -> value change -> cursor move)
-- [ ] Client reconnection
+- [x] Client reconnection
 - [ ] Experiment with client-sided dom mutation intercept
 - [ ] Embedding other jsdom documents as elements
 - [ ] Accessing element positions and sizes from the backend
