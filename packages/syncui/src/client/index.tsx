@@ -42,7 +42,7 @@ export function createClient(
 ): WebsocketDomClient {
   const reconnect = {
     enabled: options.reconnect?.enabled ?? true,
-    maxAttempts: options.reconnect?.maxAttempts ?? Infinity,
+    maxAttempts: options.reconnect?.maxAttempts ?? Number.POSITIVE_INFINITY,
     baseDelayMs: options.reconnect?.baseDelayMs ?? 500,
     maxDelayMs: options.reconnect?.maxDelayMs ?? 10_000,
     jitterRatio: options.reconnect?.jitterRatio ?? 0.2,
@@ -112,9 +112,9 @@ export function createClient(
         if (!element) {
           return;
         }
-        attributes.forEach(([name, value]) => {
+        for (const [name, value] of attributes) {
           element.setAttribute(name, value);
-        });
+        }
       };
       applyAttributes(document.documentElement, message.htmlAttributes);
       applyAttributes(document.head, message.headAttributes);
@@ -395,17 +395,17 @@ export function createClient(
     "wheel",
     "scroll",
   ];
-  eventTypes.forEach((eventType) => {
+  for (const eventType of eventTypes) {
     document.addEventListener(eventType, sendEvent, true);
-  });
+  }
 
   const debouncedSendMouseEvent = debounce(sendEvent, 250);
   const mouseEventTypes = ["mouseover", "mouseout", "mousemove"];
-  mouseEventTypes.forEach((eventType) => {
+  for (const eventType of mouseEventTypes) {
     const handler =
       eventType === "mousemove" ? debouncedSendMouseEvent : sendEvent;
     document.addEventListener(eventType, handler as EventListener, true);
-  });
+  }
   document.addEventListener(
     "mouseover",
     (event) => {

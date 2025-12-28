@@ -43,7 +43,7 @@ export type MessageFromWorker =
     };
 
 export function createBrowserStorage() {
-  let storage = new Map<string, string>();
+  const storage = new Map<string, string>();
   return {
     get length() {
       return storage.size;

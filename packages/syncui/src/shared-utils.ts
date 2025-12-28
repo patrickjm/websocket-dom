@@ -19,14 +19,14 @@ export function getXPath(
     }
     const parentXPath = getXPath(parent, window);
     if (parentXPath) {
-      return parentXPath + "/text()[" + index + "]";
+      return `${parentXPath}/text()[${index}]`;
     }
     return null;
   }
 
   const element = node as Element;
   if (element.id !== "") {
-    return '//*[@id="' + element.id + '"]';
+    return `//*[@id="${element.id}"]`;
   }
   if (element === window.document.body) {
     return "/html/body";
@@ -39,14 +39,7 @@ export function getXPath(
       if (sibling === element) {
         const parentXPath = getXPath(element.parentNode as Element, window);
         if (parentXPath) {
-          return (
-            parentXPath +
-            "/" +
-            element.tagName.toLowerCase() +
-            "[" +
-            (ix + 1) +
-            "]"
-          );
+          return `${parentXPath}/${element.tagName.toLowerCase()}[${ix + 1}]`;
         }
         return null;
       }
@@ -61,12 +54,12 @@ export function getXPath(
   return null;
 }
 
-export function debounce<F extends (...args: any[]) => any>(
-  func: F,
+export function debounce<Args extends unknown[], R>(
+  func: (...args: Args) => R,
   wait: number
-): (...args: Parameters<F>) => void {
+): (...args: Args) => void {
   let timeout: ReturnType<typeof setTimeout> | null;
-  return function executedFunction(...args: Parameters<F>): void {
+  return function executedFunction(...args: Args): void {
     const later = () => {
       if (timeout) clearTimeout(timeout);
       func(...args);

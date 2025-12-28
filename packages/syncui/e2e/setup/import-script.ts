@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
-import crypto from "crypto";
-import fs from "fs";
-import path from "path";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { test } from "@playwright/test";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
@@ -20,17 +20,17 @@ export async function importScript(page: Page, code: string) {
   await fs.promises.writeFile(testWorkerPath, writeCode, { flag: "w" });
 
   await page.waitForFunction(() => {
-    const client = (window as any).wsdomClient;
+    const client = window.syncuiTestBridge?.client;
     return !!client && client.state && client.state.snapshotApplied === true;
   });
   await page.waitForFunction(() => {
-    const client = (window as any).wsdomClient;
+    const client = window.syncuiTestBridge?.client;
     return !!client?.transport;
   });
 
   await page.evaluate(
     async ({ testWorkerPath }) => {
-      const client = (window as any).wsdomClient;
+      const client = window.syncuiTestBridge?.client;
       const transport = client?.transport;
       if (!transport) {
         throw new Error("No transport available");

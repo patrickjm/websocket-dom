@@ -57,10 +57,11 @@ export class NodeStash {
   public get(id: NodeRef): StashedNode | null {
     if (id.type === "stashed-id") {
       return this.stashed.get(id.id) ?? null;
-    } else if (id.type === "xpath") {
+    }
+    if (id.type === "xpath") {
       return getElementFromXPath(id.xpath, this.window.document) ?? null;
     }
-    throw new Error("Unknown node ref type: " + id);
+    throw new Error(`Unknown node ref type: ${id}`);
   }
 
   public findRefFor(node: StashedNode): NodeRef | null {

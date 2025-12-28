@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 
 export type PlaywrightBridgeState = {
   contentSet: boolean;
+  installed: boolean;
 };
 
 export type PlaywrightBridgeOptions = {
@@ -16,6 +17,9 @@ export async function installPlaywrightBridge(
   options: PlaywrightBridgeOptions,
   emitInstruction: (instruction: unknown) => void
 ): Promise<void> {
+  if (options.state.installed) {
+    return;
+  }
   await page.exposeBinding(options.bindingName, (_source, instruction) => {
     emitInstruction(instruction);
   });
@@ -30,10 +34,7 @@ export async function installPlaywrightBridge(
   await page.waitForLoadState("domcontentloaded");
   await page.evaluate(
     ({ bindingName }) => {
-      const globalAny = window as any;
-      if (globalAny.__syncuiPlaywrightBridge) {
-        return;
-      }
+      const bindingTarget = window as unknown as Record<string, unknown>;
 
       const shouldSkipAttribute = (name: string, value: string) => {
         const lower = name.toLowerCase();
@@ -121,15 +122,17 @@ export async function installPlaywrightBridge(
 
       const sanitizeElement = (element: Element): Element => {
         const clone = element.cloneNode(true) as Element;
-        clone.querySelectorAll("script").forEach((script) => script.remove());
+        for (const script of Array.from(clone.querySelectorAll("script"))) {
+          script.remove();
+        }
         const allElements = [clone, ...Array.from(clone.querySelectorAll("*"))];
-        allElements.forEach((node) => {
-          Array.from(node.attributes).forEach((attr) => {
+        for (const node of allElements) {
+          for (const attr of Array.from(node.attributes)) {
             if (shouldSkipAttribute(attr.name, attr.value)) {
               node.removeAttribute(attr.name);
             }
-          });
-        });
+          }
+        }
         return clone;
       };
 
@@ -162,26 +165,34 @@ export async function installPlaywrightBridge(
 
       const stripScriptNodes = (node: Node): Node => {
         if (node instanceof DocumentFragment) {
-          node.querySelectorAll("script").forEach((script) => script.remove());
+          for (const script of Array.from(node.querySelectorAll("script"))) {
+            script.remove();
+          }
         } else if (node instanceof Element) {
-          node.querySelectorAll("script").forEach((script) => script.remove());
+          for (const script of Array.from(node.querySelectorAll("script"))) {
+            script.remove();
+          }
         }
         return node;
       };
 
       const originalAppendChild = Node.prototype.appendChild;
-      (Node.prototype as any).appendChild = function (child: Node): Node {
+      Node.prototype.appendChild = function <T extends Node>(
+        this: Node,
+        child: T
+      ): T {
         if (isScriptNode(child)) {
           return child;
         }
-        return originalAppendChild.call(this, stripScriptNodes(child));
+        return originalAppendChild.call(this, stripScriptNodes(child)) as T;
       };
 
       const originalInsertBefore = Node.prototype.insertBefore;
-      (Node.prototype as any).insertBefore = function (
-        newChild: Node,
+      Node.prototype.insertBefore = function <T extends Node>(
+        this: Node,
+        newChild: T,
         refChild: Node | null
-      ): Node {
+      ): T {
         if (isScriptNode(newChild)) {
           return newChild;
         }
@@ -189,22 +200,23 @@ export async function installPlaywrightBridge(
           this,
           stripScriptNodes(newChild),
           refChild
-        );
+        ) as T;
       };
 
       const originalReplaceChild = Node.prototype.replaceChild;
-      (Node.prototype as any).replaceChild = function (
+      Node.prototype.replaceChild = function <T extends Node>(
+        this: Node,
         newChild: Node,
-        oldChild: Node
-      ): Node {
+        oldChild: T
+      ): T {
         if (isScriptNode(newChild)) {
-          return newChild;
+          return oldChild;
         }
         return originalReplaceChild.call(
           this,
           stripScriptNodes(newChild),
           oldChild
-        );
+        ) as T;
       };
 
       const originalInsertAdjacentHTML = Element.prototype.insertAdjacentHTML;
@@ -219,7 +231,7 @@ export async function installPlaywrightBridge(
       };
 
       const emit = (instruction: unknown) => {
-        const fn = globalAny[bindingName];
+        const fn = bindingTarget[bindingName];
         if (typeof fn === "function") {
           fn(instruction);
         }
@@ -251,55 +263,59 @@ export async function installPlaywrightBridge(
       };
 
       const handleMutations = (records: MutationRecord[]) => {
-        records.forEach((record) => {
+        for (const record of records) {
           if (record.type === "attributes") {
             if (!(record.target instanceof Element)) {
-              return;
+              continue;
             }
             const name = record.attributeName;
             if (!name) {
-              return;
+              continue;
             }
             const xpath = getXPath(record.target);
             if (!xpath) {
-              return;
+              continue;
             }
             const value = record.target.getAttribute(name);
             if (value === null || shouldSkipAttribute(name, value)) {
               emitRemoveAttribute(xpath, name);
-              return;
+              continue;
             }
             emitSetAttribute(xpath, name, value);
-            return;
+            continue;
           }
 
           if (record.type === "characterData") {
             const xpath = getXPath(record.target);
             if (!xpath) {
-              return;
+              continue;
             }
-            emitSetProperty(xpath, "textContent", record.target.textContent ?? "");
-            return;
+            emitSetProperty(
+              xpath,
+              "textContent",
+              record.target.textContent ?? ""
+            );
+            continue;
           }
 
           if (record.type === "childList") {
             if (!(record.target instanceof Element)) {
-              return;
+              continue;
             }
             if (
               record.addedNodes.length > 0 &&
               Array.from(record.addedNodes).some(hasUnsafeNode)
             ) {
-              return;
+              continue;
             }
             const xpath = getXPath(record.target);
             if (!xpath) {
-              return;
+              continue;
             }
             const clone = sanitizeElement(record.target);
             emitSetProperty(xpath, "innerHTML", clone.innerHTML);
           }
-        });
+        }
       };
 
       const observer = new MutationObserver(handleMutations);
@@ -310,13 +326,8 @@ export async function installPlaywrightBridge(
         characterData: true,
         attributeOldValue: true,
       });
-
-      globalAny.__syncuiPlaywrightBridge = {
-        observer,
-        emitInstruction: emit,
-        getXPath,
-      };
     },
     { bindingName: options.bindingName }
   );
+  options.state.installed = true;
 }

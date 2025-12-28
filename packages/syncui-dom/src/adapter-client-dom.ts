@@ -1,7 +1,7 @@
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 import type { UiAdapter } from "syncui/core/adapter/types";
 import type { SerializedEvent } from "syncui/core/protocol/events";
-import { type DomEmitter } from "syncui/core/ops/instructions";
+import type { DomEmitter } from "syncui/core/ops/instructions";
 import type { SnapshotMessage } from "syncui/core/protocol/messages";
 import { NodeStash } from "syncui/core/model/nodes";
 import { dispatchEvent } from "./adapter/dom/events";
@@ -24,7 +24,7 @@ export function createClientDomAdapter(
   }
   const windowRef = adapterWindow as AdapterWindow;
   const emitter = new EventEmitter() as DomEmitter;
-  const nodes = new NodeStash(windowRef as any);
+  const nodes = new NodeStash(windowRef);
   extendPrototypes(windowRef, nodes, emitter);
 
   function domImport(moduleUrl: string) {
@@ -38,7 +38,13 @@ export function createClientDomAdapter(
   }
 
   async function evalString(code: string): Promise<unknown> {
-    return windowRef.eval(code);
+    const windowEval = (
+      windowRef as unknown as { eval?: (code: string) => unknown }
+    ).eval;
+    if (typeof windowEval === "function") {
+      return windowEval(code);
+    }
+    return Function(code)();
   }
 
   function collectAttributes(element: Element | null): [string, string][] {
@@ -46,12 +52,12 @@ export function createClientDomAdapter(
       return [];
     }
     const attrs: [string, string][] = [];
-    Array.from(element.attributes).forEach((attr) => {
+    for (const attr of Array.from(element.attributes)) {
       if (shouldSkipAttribute(attr.name, attr.value)) {
-        return;
+        continue;
       }
       attrs.push([attr.name, attr.value]);
-    });
+    }
     return attrs;
   }
 

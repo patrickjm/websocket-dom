@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { importScript } from "../setup/import-script";
 
 const multiClientScript = `
@@ -40,10 +40,10 @@ test("should sync mutations and events across multiple clients", async ({
   await pageB.goto(`/?session=${sessionId}`);
 
   await pageA.waitForFunction(
-    () => (window as any).wsdomClient?.state?.snapshotApplied === true
+    () => window.syncuiTestBridge?.client?.state?.snapshotApplied === true
   );
   await pageB.waitForFunction(
-    () => (window as any).wsdomClient?.state?.snapshotApplied === true
+    () => window.syncuiTestBridge?.client?.state?.snapshotApplied === true
   );
 
   await importScript(pageA, multiClientScript);

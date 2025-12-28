@@ -1,4 +1,5 @@
 import { createClient } from "../../src/client";
+import { initSyncuiTestBridge } from "./test-bridge";
 
 const params = new URLSearchParams(window.location.search);
 let sessionId = params.get("session");
@@ -8,4 +9,4 @@ if (!sessionId) {
 const wsUrl = `ws://localhost:3333?session=${encodeURIComponent(sessionId)}`;
 const client = createClient(wsUrl);
 
-(window as any).wsdomClient = client;
+initSyncuiTestBridge(client);

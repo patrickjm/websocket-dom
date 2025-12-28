@@ -15,17 +15,26 @@ export function wrapBrowserWebSocket(ws: WebSocket): TransportConnection {
   const errorHandlers = new Set<(error: unknown) => void>();
 
   ws.addEventListener("message", (event) => {
-    const data = typeof event.data === "string" ? event.data : String(event.data);
-    messageHandlers.forEach((handler) => handler(data));
+    const data =
+      typeof event.data === "string" ? event.data : String(event.data);
+    for (const handler of messageHandlers) {
+      handler(data);
+    }
   });
   ws.addEventListener("close", () => {
-    closeHandlers.forEach((handler) => handler());
+    for (const handler of closeHandlers) {
+      handler();
+    }
   });
   ws.addEventListener("open", () => {
-    openHandlers.forEach((handler) => handler());
+    for (const handler of openHandlers) {
+      handler();
+    }
   });
   ws.addEventListener("error", (event) => {
-    errorHandlers.forEach((handler) => handler(event));
+    for (const handler of errorHandlers) {
+      handler(event);
+    }
   });
 
   return {

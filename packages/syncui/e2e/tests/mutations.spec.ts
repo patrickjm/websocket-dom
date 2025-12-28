@@ -139,7 +139,7 @@ test("should sync initial head/body/html state without scripts", async ({
   await gotoTestSession(page);
 
   await page.waitForFunction(() => {
-    const client = (window as any).wsdomClient;
+    const client = window.syncuiTestBridge?.client;
     return !!client?.transport?.isOpen?.();
   });
   await page.waitForFunction(() => {
@@ -162,7 +162,7 @@ test("should resync snapshot on demand", async ({ page }) => {
   await page.evaluate(() => {
     document.title = "Client Title";
     document.body.setAttribute("data-state", "client");
-    const client = (window as any).wsdomClient;
+    const client = window.syncuiTestBridge?.client;
     client?.transport?.send(JSON.stringify({ type: "resync" }));
   });
 

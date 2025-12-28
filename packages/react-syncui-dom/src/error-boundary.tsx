@@ -1,5 +1,5 @@
-import React, { Component, type ErrorInfo, type ReactNode } from 'react';
-import WebSocket from 'ws';
+import React, { Component, type ErrorInfo, type ReactNode } from "react";
+import type WebSocket from "ws";
 
 interface Props {
   ws: WebSocket;
@@ -14,13 +14,15 @@ interface State {
 
 export function handleError(ws: WebSocket, error: Error) {
   console.error(error);
-  if (process.env.NODE_ENV !== 'development') {
+  if (process.env.NODE_ENV !== "development") {
     return;
   }
-  ws.send(JSON.stringify({
-    type: 'error',
-    error: error.message,
-  }));
+  ws.send(
+    JSON.stringify({
+      type: "error",
+      error: error.message,
+    })
+  );
 }
 
 class ErrorBoundary extends Component<Props, State> {

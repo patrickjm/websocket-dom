@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import crypto from "crypto";
+import crypto from "node:crypto";
 
 function withSession(pathname: string, sessionId: string): string {
   if (pathname.includes("session=")) {
@@ -11,7 +11,7 @@ function withSession(pathname: string, sessionId: string): string {
 
 export async function gotoTestSession(
   page: Page,
-  pathname: string = "/"
+  pathname = "/"
 ): Promise<string> {
   const sessionId = crypto.randomUUID();
   const url = withSession(pathname, sessionId);

@@ -1,4 +1,4 @@
-import path from 'path';
+import path from 'node:path';
 import { defineConfig } from 'vite';
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);

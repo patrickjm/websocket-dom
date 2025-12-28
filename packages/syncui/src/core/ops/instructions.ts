@@ -7,7 +7,7 @@ export type DomEmitterEvents = {
 };
 export type DomEmitter = TypedEmitter<DomEmitterEvents>;
 
-export type Serialized = readonly any[];
+export type Serialized = readonly unknown[];
 
 interface InstructionApplyArgs {
   window: Window;
@@ -221,7 +221,8 @@ export namespace SetProperty {
         element.textContent = data.value;
         return;
       }
-      (element as any)[data.name] = data.value;
+      const target = element as HTMLElement & Record<string, unknown>;
+      target[data.name] = data.value;
     }
   }
 }
@@ -292,7 +293,10 @@ export namespace CloneNode {
   export function apply({ nodes }: InstructionApplyArgs, data: Data): void {
     console.log("clone node", data);
     const node = nodes.get(data.ref);
-    const clonedNode = node!.cloneNode(data.deep);
+    if (!node) {
+      return;
+    }
+    const clonedNode = node.cloneNode(data.deep);
     nodes.stash(clonedNode, data.cloneId);
   }
 }
@@ -330,7 +334,7 @@ export namespace InsertAdjacentElement {
     const toInsert = nodes.get({
       type: "stashed-id",
       id: data.element,
-    } as StashedIdNodeRef)!;
+    } as StashedIdNodeRef);
     if (element && toInsert) {
       element.insertAdjacentElement(data.where, toInsert as Element);
     }

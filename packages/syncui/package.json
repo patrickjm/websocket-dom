@@ -26,6 +26,7 @@
     "clean": "touch ./dist && rm -r ./dist",
     "build": "yarn clean && yarn build:types && yarn build:server && yarn build:client",
     "e2e": "SYNCUI_ADAPTER=jsdom playwright test && SYNCUI_ADAPTER=playwright playwright test",
+    "lint": "biome lint \"src\" \"e2e\"",
     "e2e:server": "node --import tsx e2e/setup/start-server.ts",
     "start": "vite build && tsx ./src/index.ts",
     "dev": "nodemon --watch src --watch vite.config.ts --watch index.html --watch public --ext ts,html,json,tsx --exec yarn start"

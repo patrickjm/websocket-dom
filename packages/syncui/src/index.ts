@@ -1,7 +1,7 @@
-import EventEmitter from "events";
+import EventEmitter from "node:events";
 import type TypedEmitter from "typed-emitter";
 import type { SerializedEvent } from "./core/protocol/events";
-import { type Serialized } from "./core/ops/instructions";
+import type { Serialized } from "./core/ops/instructions";
 import type { InstructionMessage, Message } from "./core/protocol/messages";
 import type { UiAdapter, UiAdapterFactory } from "./core/adapter/types";
 import type { TransportConnection } from "./core/transport/types";
@@ -150,7 +150,7 @@ export class WebsocketDOM {
     if (!this.worker) {
       throw new Error("No worker is available for this adapter.");
     }
-    this.worker.postMessage(message as any);
+    this.worker.postMessage(message);
   }
 
   terminate(): void {

@@ -1,7 +1,21 @@
-import { dirname, join } from "path";
 import type { MessageToWorker, SerializedEvent } from "./shared-utils";
 
-const __dirname = dirname(new URL(import.meta.url).pathname);
+const resolveWorkerPath = (): string => {
+  const workerUrl = new URL(/* @vite-ignore */ "./worker.js", import.meta.url);
+  if (workerUrl.protocol !== "file:") {
+    return workerUrl.toString();
+  }
+  let pathname = decodeURIComponent(workerUrl.pathname);
+  if (
+    pathname.length > 2 &&
+    pathname.startsWith("/") &&
+    /[A-Za-z]/.test(pathname[1]) &&
+    pathname[2] === ":"
+  ) {
+    pathname = pathname.slice(1);
+  }
+  return pathname;
+};
 
 export type ReactSyncUiDomAdapter = {
   import: (path: string) => void;
@@ -10,7 +24,7 @@ export type ReactSyncUiDomAdapter = {
 };
 
 export function loadReactSyncUiDom(wsDom: ReactSyncUiDomAdapter) {
-  wsDom.import(join(__dirname.replace("src", "dist"), "worker.js"));
+  wsDom.import(resolveWorkerPath());
 
   wsDom.on("clientEvent", (event) => {
     wsDom.postWorkerMessage({

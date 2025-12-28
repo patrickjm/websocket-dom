@@ -1,7 +1,7 @@
 import express from "express";
-import http from "http";
-import path from "path";
-import { fileURLToPath } from "url";
+import http from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { WebsocketDOM } from "../../src";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";

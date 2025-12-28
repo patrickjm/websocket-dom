@@ -1,16 +1,16 @@
 import type { AdapterWindow } from "./window-types";
-import {
-  type SerializedChangeEvent,
-  type SerializedClickEvent,
-  type SerializedDragEvent,
-  type SerializedEvent,
-  type SerializedFocusEvent,
-  type SerializedInputEvent,
-  type SerializedKeyboardEvent,
-  type SerializedMouseButtonEvent,
-  type SerializedMouseEvent,
-  type SerializedSubmitEvent,
-  type SerializedWheelEvent,
+import type {
+  SerializedChangeEvent,
+  SerializedClickEvent,
+  SerializedDragEvent,
+  SerializedEvent,
+  SerializedFocusEvent,
+  SerializedInputEvent,
+  SerializedKeyboardEvent,
+  SerializedMouseButtonEvent,
+  SerializedMouseEvent,
+  SerializedSubmitEvent,
+  SerializedWheelEvent,
 } from "syncui/core/protocol/events";
 import type { NodeStash } from "syncui/core/model/nodes";
 import { getElementFromXPath } from "syncui/core/model/xpath";
@@ -18,6 +18,10 @@ import type { DomEmitter } from "syncui/core/ops/instructions";
 import { withSuppressedTarget } from "./suppress";
 
 type DispatchTarget = HTMLElement | Document | AdapterWindow;
+type ConstructorWindow = Window & typeof globalThis;
+
+const getConstructorWindow = (window: AdapterWindow): ConstructorWindow =>
+  window as ConstructorWindow;
 
 export function dispatchEvent(
   nodes: NodeStash,
@@ -78,12 +82,14 @@ function deserializeEvent(
         targetElement ?? fallbackTarget,
         deserializeFocusEvent(event, window),
       ];
-    case "change":
+    case "change": {
       const changeEvent = deserializeChangeEvent(event, window);
       return [targetElement ?? fallbackTarget, changeEvent];
-    case "input":
+    }
+    case "input": {
       const inputEvent = deserializeInputEvent(event, window);
       return [targetElement ?? fallbackTarget, inputEvent];
+    }
     case "submit":
       return [
         targetElement ?? fallbackTarget,
@@ -177,10 +183,11 @@ function deserializeClickEvent(
   event: SerializedClickEvent,
   window: AdapterWindow
 ): MouseEvent {
-  return new window.MouseEvent("click", {
+  const ctorWindow = getConstructorWindow(window);
+  return new ctorWindow.MouseEvent("click", {
     bubbles: true,
     cancelable: true,
-    view: window as any,
+    view: ctorWindow,
     clientX: event.clientX,
     clientY: event.clientY,
     button: event.button || 0,
@@ -196,10 +203,11 @@ function deserializeMouseButtonEvent(
   event: SerializedMouseButtonEvent,
   window: AdapterWindow
 ): MouseEvent {
-  return new window.MouseEvent(event.type, {
+  const ctorWindow = getConstructorWindow(window);
+  return new ctorWindow.MouseEvent(event.type, {
     bubbles: true,
     cancelable: true,
-    view: window as any,
+    view: ctorWindow,
     clientX: event.clientX,
     clientY: event.clientY,
     button: event.button || 0,
@@ -215,7 +223,8 @@ function deserializeKeyboardEvent(
   event: SerializedKeyboardEvent,
   window: AdapterWindow
 ): KeyboardEvent {
-  return new window.KeyboardEvent(event.type, {
+  const ctorWindow = getConstructorWindow(window);
+  return new ctorWindow.KeyboardEvent(event.type, {
     bubbles: true,
     cancelable: true,
     key: event.key,
@@ -237,10 +246,11 @@ function deserializeFocusEvent(
   event: SerializedFocusEvent,
   window: AdapterWindow
 ): FocusEvent {
-  return new window.FocusEvent(event.type, {
+  const ctorWindow = getConstructorWindow(window);
+  return new ctorWindow.FocusEvent(event.type, {
     bubbles: true,
     cancelable: false,
-    view: window as any,
+    view: ctorWindow,
     relatedTarget: null,
   });
 }
@@ -249,7 +259,8 @@ function deserializeChangeEvent(
   event: SerializedChangeEvent,
   window: AdapterWindow
 ): Event {
-  const changeEvent = new window.Event("change", {
+  const ctorWindow = getConstructorWindow(window);
+  const changeEvent = new ctorWindow.Event("change", {
     bubbles: true,
     cancelable: true,
   });
@@ -260,7 +271,8 @@ function deserializeInputEvent(
   event: SerializedInputEvent,
   window: AdapterWindow
 ): InputEvent {
-  const inputEvent = new window.InputEvent("input", {
+  const ctorWindow = getConstructorWindow(window);
+  const inputEvent = new ctorWindow.InputEvent("input", {
     bubbles: true,
     cancelable: true,
     inputType: event.inputType,
@@ -274,7 +286,8 @@ function deserializeSubmitEvent(
   event: SerializedSubmitEvent,
   window: AdapterWindow
 ): SubmitEvent {
-  return new window.SubmitEvent("submit", {
+  const ctorWindow = getConstructorWindow(window);
+  return new ctorWindow.SubmitEvent("submit", {
     bubbles: true,
     cancelable: true,
   });
@@ -284,10 +297,11 @@ function deserializeMouseEvent(
   event: SerializedMouseEvent,
   window: AdapterWindow
 ): MouseEvent {
-  return new window.MouseEvent(event.type, {
+  const ctorWindow = getConstructorWindow(window);
+  return new ctorWindow.MouseEvent(event.type, {
     bubbles: true,
     cancelable: true,
-    view: window as any,
+    view: ctorWindow,
     detail: 0,
     screenX: event.screenX,
     screenY: event.screenY,
@@ -307,11 +321,12 @@ function deserializeDragEvent(
   event: SerializedDragEvent,
   window: AdapterWindow
 ): Event {
-  if (typeof (window as any).DragEvent === "function") {
-    return new (window as any).DragEvent(event.type, {
+  const ctorWindow = getConstructorWindow(window);
+  if (typeof ctorWindow.DragEvent === "function") {
+    return new ctorWindow.DragEvent(event.type, {
       bubbles: true,
       cancelable: true,
-      view: window as any,
+      view: ctorWindow,
       clientX: event.clientX,
       clientY: event.clientY,
       screenX: event.screenX,
@@ -322,10 +337,10 @@ function deserializeDragEvent(
       shiftKey: event.shiftKey,
     });
   }
-  return new window.MouseEvent(event.type, {
+  return new ctorWindow.MouseEvent(event.type, {
     bubbles: true,
     cancelable: true,
-    view: window as any,
+    view: ctorWindow,
     clientX: event.clientX,
     clientY: event.clientY,
     screenX: event.screenX,
@@ -341,8 +356,9 @@ function deserializeWheelEvent(
   event: SerializedWheelEvent,
   window: AdapterWindow
 ): Event {
-  if (typeof window.WheelEvent === "function") {
-    return new window.WheelEvent("wheel", {
+  const ctorWindow = getConstructorWindow(window);
+  if (typeof ctorWindow.WheelEvent === "function") {
+    return new ctorWindow.WheelEvent("wheel", {
       bubbles: true,
       cancelable: true,
       deltaX: event.deltaX,
@@ -364,11 +380,12 @@ function deserializePointerEvent(
   event: SerializedEvent,
   window: AdapterWindow
 ): Event {
-  if (typeof (window as any).PointerEvent === "function") {
-    return new (window as any).PointerEvent(event.type, {
+  const ctorWindow = getConstructorWindow(window);
+  if (typeof ctorWindow.PointerEvent === "function") {
+    return new ctorWindow.PointerEvent(event.type, {
       bubbles: true,
       cancelable: true,
-      view: window as any,
+      view: ctorWindow,
     });
   }
   return deserializeDefaultEvent(event, window);
@@ -378,8 +395,9 @@ function deserializeTouchEvent(
   event: SerializedEvent,
   window: AdapterWindow
 ): Event {
-  if (typeof (window as any).TouchEvent === "function") {
-    return new (window as any).TouchEvent(event.type, {
+  const ctorWindow = getConstructorWindow(window);
+  if (typeof ctorWindow.TouchEvent === "function") {
+    return new ctorWindow.TouchEvent(event.type, {
       bubbles: true,
       cancelable: true,
     });
@@ -391,8 +409,9 @@ function deserializeClipboardEvent(
   event: SerializedEvent,
   window: AdapterWindow
 ): Event {
-  if (typeof (window as any).ClipboardEvent === "function") {
-    return new (window as any).ClipboardEvent(event.type, {
+  const ctorWindow = getConstructorWindow(window);
+  if (typeof ctorWindow.ClipboardEvent === "function") {
+    return new ctorWindow.ClipboardEvent(event.type, {
       bubbles: true,
       cancelable: true,
     });
@@ -404,11 +423,12 @@ function deserializeCompositionEvent(
   event: SerializedEvent,
   window: AdapterWindow
 ): Event {
-  if (typeof (window as any).CompositionEvent === "function") {
-    return new (window as any).CompositionEvent(event.type, {
+  const ctorWindow = getConstructorWindow(window);
+  if (typeof ctorWindow.CompositionEvent === "function") {
+    return new ctorWindow.CompositionEvent(event.type, {
       bubbles: true,
       cancelable: true,
-      data: null,
+      data: "",
     });
   }
   return deserializeDefaultEvent(event, window);
@@ -418,12 +438,13 @@ function deserializeBeforeInputEvent(
   event: SerializedEvent,
   window: AdapterWindow
 ): Event {
-  if (typeof (window as any).InputEvent === "function") {
-    return new window.InputEvent("beforeinput", {
+  const ctorWindow = getConstructorWindow(window);
+  if (typeof ctorWindow.InputEvent === "function") {
+    return new ctorWindow.InputEvent("beforeinput", {
       bubbles: true,
       cancelable: true,
       inputType: "insertText",
-      data: null,
+      data: "",
     });
   }
   return deserializeDefaultEvent(event, window);
@@ -433,7 +454,8 @@ function deserializeDefaultEvent(
   event: SerializedEvent,
   window: AdapterWindow
 ): Event {
-  return new window.Event(event.type, {
+  const ctorWindow = getConstructorWindow(window);
+  return new ctorWindow.Event(event.type, {
     bubbles: true,
     cancelable: true,
   });
@@ -443,9 +465,10 @@ function isTextInputElement(
   window: AdapterWindow,
   element: EventTarget
 ): element is HTMLInputElement | HTMLTextAreaElement {
+  const ctorWindow = getConstructorWindow(window);
   return (
-    element instanceof window.HTMLInputElement ||
-    element instanceof window.HTMLTextAreaElement
+    element instanceof ctorWindow.HTMLInputElement ||
+    element instanceof ctorWindow.HTMLTextAreaElement
   );
 }
 
@@ -456,10 +479,11 @@ function applyInputValue(
   options: { suppress?: boolean } = {}
 ) {
   const { suppress = true } = options;
+  const ctorWindow = getConstructorWindow(window);
   const apply = () => {
     if (isTextInputElement(window, element)) {
       element.value = value;
-    } else if (element instanceof window.HTMLElement) {
+    } else if (element instanceof ctorWindow.HTMLElement) {
       const htmlElement = element as HTMLElement;
       if (
         htmlElement.isContentEditable ||
@@ -531,9 +555,11 @@ function simulateKeyboardInput(
     }
     inputType = "deleteContentForward";
   } else if (key === "Enter") {
-    if (element instanceof window.HTMLTextAreaElement) {
-      nextValue =
-        value.slice(0, selectionStart) + "\n" + value.slice(selectionEnd);
+    const ctorWindow = getConstructorWindow(window);
+    if (element instanceof ctorWindow.HTMLTextAreaElement) {
+      nextValue = `${value.slice(0, selectionStart)}\n${value.slice(
+        selectionEnd
+      )}`;
       nextCaret = selectionStart + 1;
       inputType = "insertLineBreak";
     }
@@ -554,7 +580,8 @@ function simulateKeyboardInput(
   }
 
   if (inputType) {
-    const inputEvent = new window.InputEvent("input", {
+    const ctorWindow = getConstructorWindow(window);
+    const inputEvent = new ctorWindow.InputEvent("input", {
       bubbles: true,
       cancelable: true,
       inputType,
@@ -565,7 +592,8 @@ function simulateKeyboardInput(
   }
 
   if (key === "Enter") {
-    const changeEvent = new window.Event("change", {
+    const ctorWindow = getConstructorWindow(window);
+    const changeEvent = new ctorWindow.Event("change", {
       bubbles: true,
       cancelable: true,
     });

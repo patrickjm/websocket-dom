@@ -133,18 +133,23 @@ test("should handle IME composition and beforeinput flow", async ({ page }) => {
   const output = page.locator("#output");
 
   await page.evaluate(() => {
-    (window as any).eventLog = [];
+    if (!window.syncuiTestBridge) {
+      throw new Error("syncuiTestBridge not initialized");
+    }
+    window.syncuiTestBridge.eventLog = [];
     const inputEl = document.querySelector("#test-input") as HTMLInputElement;
-    const record = (event: Event) => (window as any).eventLog.push(event.type);
-    [
+    const record = (event: Event) =>
+      window.syncuiTestBridge?.eventLog.push(event.type);
+    const eventTypes = [
       "compositionstart",
       "compositionupdate",
       "compositionend",
       "beforeinput",
       "input",
-    ].forEach((type) => {
+    ];
+    for (const type of eventTypes) {
       inputEl.addEventListener(type, record);
-    });
+    }
   });
 
   await page.evaluate(() => {
@@ -191,14 +196,13 @@ test("should handle IME composition and beforeinput flow", async ({ page }) => {
   await expect(output).toHaveText("ime");
 
   await page.waitForFunction(() => {
-    const log = (window as any).eventLog as string[] | undefined;
+    const log = window.syncuiTestBridge?.eventLog;
     return (
-      log &&
-      log.includes("compositionstart") &&
-      log.includes("compositionupdate") &&
-      log.includes("compositionend") &&
-      log.includes("beforeinput") &&
-      log.includes("input")
+      log?.includes("compositionstart") &&
+      log?.includes("compositionupdate") &&
+      log?.includes("compositionend") &&
+      log?.includes("beforeinput") &&
+      log?.includes("input")
     );
   });
 });
@@ -212,7 +216,7 @@ test("should simulate keyboard input when only keydown arrives", async ({
   await page.waitForSelector("#simulate-input");
 
   await page.evaluate(() => {
-    const client = (window as any).wsdomClient;
+    const client = window.syncuiTestBridge?.client;
     client?.transport?.send(
       JSON.stringify({
         type: "event",

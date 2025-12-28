@@ -1,8 +1,8 @@
-import { EventEmitter } from "events";
-import crypto from "crypto";
-import fs from "fs";
+import { EventEmitter } from "node:events";
+import crypto from "node:crypto";
+import fs from "node:fs";
 import type { UiAdapter } from "syncui/core/adapter/types";
-import type { DomEmitter } from "syncui/core/ops/instructions";
+import type { DomEmitter, Serialized } from "syncui/core/ops/instructions";
 import { installPlaywrightBridge } from "./bridge";
 import { createDispatchEvent } from "./dispatch";
 import { createSnapshotGetter } from "./snapshot";
@@ -18,10 +18,10 @@ export function createPlaywrightAdapter(
   }
   const { page } = deps;
   const emitter = new EventEmitter() as DomEmitter;
-  const bindingName = `__syncuiEmitInstruction_${crypto
+  const bindingName = `syncuiEmitInstruction_${crypto
     .randomUUID()
     .replace(/-/g, "")}`;
-  const bridgeState = { contentSet: false };
+  const bridgeState = { contentSet: false, installed: false };
   let bridgePromise: Promise<void> | null = null;
 
   const ensureBridge = async (): Promise<void> => {
@@ -37,7 +37,7 @@ export function createPlaywrightAdapter(
         state: bridgeState,
       },
       (instruction) => {
-        emitter.emit("instruction", instruction as any);
+        emitter.emit("instruction", instruction as Serialized);
       }
     );
     return bridgePromise;
@@ -48,12 +48,16 @@ export function createPlaywrightAdapter(
     return page.evaluate(fn);
   };
 
-  const evalInPageWithArg = async <T>(
-    fn: (arg: any) => T | Promise<T>,
-    arg: any
+  const evalInPageWithArg = async <T, Arg>(
+    fn: (arg: Arg) => T | Promise<T>,
+    arg: Arg
   ): Promise<T> => {
     await ensureBridge();
-    return page.evaluate(fn as any, arg);
+    const evaluate = page.evaluate.bind(page) as <TResult, TArg>(
+      pageFunction: (arg: TArg) => TResult | Promise<TResult>,
+      pageArg: TArg
+    ) => Promise<TResult>;
+    return evaluate(fn, arg);
   };
 
   const dispatchEvent = createDispatchEvent(evalInPageWithArg);
@@ -79,7 +83,7 @@ export function createPlaywrightAdapter(
   }
 
   async function evalString(code: string): Promise<unknown> {
-    return evalInPageWithArg((script) => window.eval(script), code);
+    return evalInPageWithArg((script) => Function(script)(), code);
   }
 
   return {

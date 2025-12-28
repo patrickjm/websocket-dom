@@ -1,1 +1,1 @@
-export type AdapterWindow = Window & typeof globalThis;
+export type AdapterWindow = Window;

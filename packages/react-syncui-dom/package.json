@@ -15,7 +15,8 @@
   "scripts": {
     "start": "vite build && tsx ./src/index.tsx",
     "dev": "nodemon --watch src --watch vite.config.ts --watch index.html --watch public --ext ts,html,json,tsx --exec yarn start",
-    "build": "vite build && tsc"
+    "build": "vite build && tsc",
+    "lint": "biome lint \"src\""
   },
   "packageManager": "yarn@1.22.22",
   "devDependencies": {

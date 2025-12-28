@@ -1,7 +1,7 @@
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 import type { UiAdapter } from "syncui/core/adapter/types";
 import type { SerializedEvent } from "syncui/core/protocol/events";
-import { type DomEmitter } from "syncui/core/ops/instructions";
+import type { DomEmitter } from "syncui/core/ops/instructions";
 import type { SnapshotMessage } from "syncui/core/protocol/messages";
 import type { AdapterWindow } from "./window-types";
 import { NodeStash } from "syncui/core/model/nodes";
@@ -9,6 +9,24 @@ import { dispatchEvent } from "./events";
 import { extendPrototypes } from "./prototypes";
 import { createBrowserStorage } from "./utils";
 import { sanitizeElement, shouldSkipAttribute } from "./sanitize";
+
+type GlobalScope = {
+  window?: Window;
+  document?: Document;
+  Node?: typeof Node;
+  Element?: typeof Element;
+  Event?: typeof Event;
+  EventTarget?: typeof EventTarget;
+  XMLSerializer?: typeof XMLSerializer;
+  XPathResult?: typeof XPathResult;
+  XPathEvaluator?: typeof XPathEvaluator;
+  localStorage?: Storage;
+  sessionStorage?: Storage;
+};
+
+const getGlobalScope = (): GlobalScope => globalThis as unknown as GlobalScope;
+
+let globalsQueue: Promise<unknown> = Promise.resolve();
 
 export type JsdomAdapterDeps = {
   JSDOM: typeof import("jsdom").JSDOM;
@@ -31,89 +49,76 @@ export function createJsdomAdapter(
     resources: "usable",
   });
   const adapterWindow = dom.window as unknown as AdapterWindow;
-  const nodes = new NodeStash(adapterWindow as any);
+  const nodes = new NodeStash(adapterWindow);
   extendPrototypes(adapterWindow, nodes, emitter);
 
   const localStorage = createBrowserStorage();
   const sessionStorage = createBrowserStorage();
 
   const setGlobals = () => {
-    const globalThisAny = globalThis as any;
-    globalThisAny.window = dom.window;
-    globalThisAny.document = dom.window.document;
-    globalThisAny.Node = dom.window.Node;
-    globalThisAny.Element = dom.window.Element;
-    globalThisAny.Event = dom.window.Event;
-    globalThisAny.EventTarget = dom.window.EventTarget;
-    globalThisAny.XMLSerializer = dom.window.XMLSerializer;
-    globalThisAny.XPathResult = dom.window.XPathResult;
-    globalThisAny.XPathEvaluator = dom.window.XPathEvaluator;
-    globalThisAny.localStorage = localStorage;
-    globalThisAny.sessionStorage = sessionStorage;
+    const scope = getGlobalScope();
+    scope.window = dom.window as unknown as Window;
+    scope.document = dom.window.document;
+    scope.Node = dom.window.Node;
+    scope.Element = dom.window.Element;
+    scope.Event = dom.window.Event;
+    scope.EventTarget = dom.window.EventTarget;
+    scope.XMLSerializer = dom.window.XMLSerializer;
+    scope.XPathResult = dom.window.XPathResult;
+    scope.XPathEvaluator = dom.window.XPathEvaluator;
+    scope.localStorage = localStorage;
+    scope.sessionStorage = sessionStorage;
   };
 
   const withGlobals = <T>(fn: () => T): T => {
-    const globalThisAny = globalThis as any;
+    const scope = getGlobalScope();
     const previous = {
-      window: globalThisAny.window,
-      document: globalThisAny.document,
-      Node: globalThisAny.Node,
-      Element: globalThisAny.Element,
-      Event: globalThisAny.Event,
-      EventTarget: globalThisAny.EventTarget,
-      XMLSerializer: globalThisAny.XMLSerializer,
-      XPathResult: globalThisAny.XPathResult,
-      XPathEvaluator: globalThisAny.XPathEvaluator,
-      localStorage: globalThisAny.localStorage,
-      sessionStorage: globalThisAny.sessionStorage,
+      window: scope.window,
+      document: scope.document,
+      Node: scope.Node,
+      Element: scope.Element,
+      Event: scope.Event,
+      EventTarget: scope.EventTarget,
+      XMLSerializer: scope.XMLSerializer,
+      XPathResult: scope.XPathResult,
+      XPathEvaluator: scope.XPathEvaluator,
+      localStorage: scope.localStorage,
+      sessionStorage: scope.sessionStorage,
     };
     setGlobals();
     try {
       return fn();
     } finally {
-      Object.assign(globalThisAny, previous);
+      Object.assign(scope, previous);
     }
   };
 
   const withGlobalsAsync = async <T>(fn: () => Promise<T>): Promise<T> => {
-    const globalThisAny = globalThis as any;
+    const scope = getGlobalScope();
     const previous = {
-      window: globalThisAny.window,
-      document: globalThisAny.document,
-      Node: globalThisAny.Node,
-      Element: globalThisAny.Element,
-      Event: globalThisAny.Event,
-      EventTarget: globalThisAny.EventTarget,
-      XMLSerializer: globalThisAny.XMLSerializer,
-      XPathResult: globalThisAny.XPathResult,
-      XPathEvaluator: globalThisAny.XPathEvaluator,
-      localStorage: globalThisAny.localStorage,
-      sessionStorage: globalThisAny.sessionStorage,
+      window: scope.window,
+      document: scope.document,
+      Node: scope.Node,
+      Element: scope.Element,
+      Event: scope.Event,
+      EventTarget: scope.EventTarget,
+      XMLSerializer: scope.XMLSerializer,
+      XPathResult: scope.XPathResult,
+      XPathEvaluator: scope.XPathEvaluator,
+      localStorage: scope.localStorage,
+      sessionStorage: scope.sessionStorage,
     };
     setGlobals();
     try {
       return await fn();
     } finally {
-      Object.assign(globalThisAny, previous);
+      Object.assign(scope, previous);
     }
-  };
-
-  const getGlobalQueue = (): Promise<unknown> => {
-    const existing = (globalThis as any).__syncuiDomGlobalsQueue as
-      | Promise<unknown>
-      | undefined;
-    if (existing) {
-      return existing;
-    }
-    const created = Promise.resolve();
-    (globalThis as any).__syncuiDomGlobalsQueue = created;
-    return created;
   };
 
   const enqueueGlobals = <T>(fn: () => Promise<T>): Promise<T> => {
-    const current = getGlobalQueue();
-    const next = current.then(fn);
-    (globalThis as any).__syncuiDomGlobalsQueue = next.catch(() => {});
+    const next = globalsQueue.then(fn);
+    globalsQueue = next.catch(() => {});
     return next;
   };
 
@@ -140,12 +145,12 @@ export function createJsdomAdapter(
       return [];
     }
     const attrs: [string, string][] = [];
-    Array.from(element.attributes).forEach((attr) => {
+    for (const attr of Array.from(element.attributes)) {
       if (shouldSkipAttribute(attr.name, attr.value)) {
-        return;
+        continue;
       }
       attrs.push([attr.name, attr.value]);
-    });
+    }
     return attrs;
   }
 

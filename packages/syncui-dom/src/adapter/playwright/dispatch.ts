@@ -1,8 +1,8 @@
 import type { SerializedEvent } from "syncui/core/protocol/events";
 
-export type EvalInPageWithArg = <T>(
-  fn: (arg: any) => T | Promise<T>,
-  arg: any
+export type EvalInPageWithArg = <T, Arg>(
+  fn: (arg: Arg) => T | Promise<T>,
+  arg: Arg
 ) => Promise<T>;
 
 export function createDispatchEvent(evalInPageWithArg: EvalInPageWithArg) {
@@ -143,27 +143,32 @@ export function createDispatchEvent(evalInPageWithArg: EvalInPageWithArg) {
         applyInputValue(target, String(payload.value));
       }
 
-      if (
-        type === "keydown" &&
-        (payload as any).simulate &&
-        target instanceof Element
-      ) {
-        if (typeof (payload as any).key === "string") {
-          simulateKeyboardInput(target, String((payload as any).key));
+      if (type === "keydown" && target instanceof Element) {
+        const simulate = (payload as SerializedEvent & { simulate?: boolean })
+          .simulate;
+        if (simulate && "key" in payload && typeof payload.key === "string") {
+          simulateKeyboardInput(target, payload.key);
         }
       }
 
       let dispatched: Event;
       if (type.startsWith("key")) {
+        if (
+          payload.type !== "keydown" &&
+          payload.type !== "keyup" &&
+          payload.type !== "keypress"
+        ) {
+          return;
+        }
         dispatched = new KeyboardEvent(type, {
-          key: (payload as any).key,
-          code: (payload as any).code,
-          keyCode: (payload as any).keyCode,
-          which: (payload as any).which,
-          altKey: (payload as any).altKey,
-          ctrlKey: (payload as any).ctrlKey,
-          metaKey: (payload as any).metaKey,
-          shiftKey: (payload as any).shiftKey,
+          key: payload.key,
+          code: payload.code,
+          keyCode: payload.keyCode,
+          which: payload.which,
+          altKey: payload.altKey,
+          ctrlKey: payload.ctrlKey,
+          metaKey: payload.metaKey,
+          shiftKey: payload.shiftKey,
           bubbles: true,
           cancelable: true,
         });
@@ -179,15 +184,29 @@ export function createDispatchEvent(evalInPageWithArg: EvalInPageWithArg) {
         type === "mouseenter" ||
         type === "mouseleave"
       ) {
+        if (
+          payload.type !== "click" &&
+          payload.type !== "mousedown" &&
+          payload.type !== "mouseup" &&
+          payload.type !== "dblclick" &&
+          payload.type !== "contextmenu" &&
+          payload.type !== "mousemove" &&
+          payload.type !== "mouseout" &&
+          payload.type !== "mouseover" &&
+          payload.type !== "mouseenter" &&
+          payload.type !== "mouseleave"
+        ) {
+          return;
+        }
         dispatched = new MouseEvent(type, {
-          clientX: (payload as any).clientX,
-          clientY: (payload as any).clientY,
-          button: (payload as any).button,
-          buttons: (payload as any).buttons,
-          altKey: (payload as any).altKey,
-          ctrlKey: (payload as any).ctrlKey,
-          metaKey: (payload as any).metaKey,
-          shiftKey: (payload as any).shiftKey,
+          clientX: payload.clientX,
+          clientY: payload.clientY,
+          button: "button" in payload ? payload.button : 0,
+          buttons: "buttons" in payload ? payload.buttons : 1,
+          altKey: payload.altKey,
+          ctrlKey: payload.ctrlKey,
+          metaKey: payload.metaKey,
+          shiftKey: payload.shiftKey,
           bubbles: true,
           cancelable: true,
         });
@@ -196,19 +215,34 @@ export function createDispatchEvent(evalInPageWithArg: EvalInPageWithArg) {
           dispatched = new PointerEvent(type, {
             bubbles: true,
             cancelable: true,
-            clientX: (payload as any).clientX,
-            clientY: (payload as any).clientY,
+            clientX:
+              "clientX" in payload && typeof payload.clientX === "number"
+                ? payload.clientX
+                : 0,
+            clientY:
+              "clientY" in payload && typeof payload.clientY === "number"
+                ? payload.clientY
+                : 0,
           });
         } else {
           dispatched = new Event(type, { bubbles: true, cancelable: true });
         }
       } else if (type === "input" || type === "beforeinput") {
+        if (type === "input" && payload.type !== "input") {
+          return;
+        }
         dispatched = new InputEvent(type, {
           bubbles: true,
           cancelable: true,
-          data: (payload as any).data ?? null,
-          inputType: (payload as any).inputType ?? "insertText",
-          isComposing: (payload as any).isComposing ?? false,
+          data: "data" in payload ? payload.data ?? null : null,
+          inputType:
+            "inputType" in payload && typeof payload.inputType === "string"
+              ? payload.inputType
+              : "insertText",
+          isComposing:
+            "isComposing" in payload && typeof payload.isComposing === "boolean"
+              ? payload.isComposing
+              : false,
         });
       } else if (
         type === "compositionstart" ||
@@ -218,7 +252,10 @@ export function createDispatchEvent(evalInPageWithArg: EvalInPageWithArg) {
         dispatched = new CompositionEvent(type, {
           bubbles: true,
           cancelable: true,
-          data: (payload as any).data ?? null,
+          data:
+            "data" in payload && typeof payload.data === "string"
+              ? payload.data
+              : "",
         });
       } else {
         dispatched = new Event(type, { bubbles: true, cancelable: true });

@@ -23,15 +23,17 @@ export function createSnapshotGetter(evalInPage: EvalInPage) {
 
       const sanitizeElement = (element: Element): Element => {
         const clone = element.cloneNode(true) as Element;
-        clone.querySelectorAll("script").forEach((script) => script.remove());
+        for (const script of Array.from(clone.querySelectorAll("script"))) {
+          script.remove();
+        }
         const allElements = [clone, ...Array.from(clone.querySelectorAll("*"))];
-        allElements.forEach((node) => {
-          Array.from(node.attributes).forEach((attr) => {
+        for (const node of allElements) {
+          for (const attr of Array.from(node.attributes)) {
             if (shouldSkipAttribute(attr.name, attr.value)) {
               node.removeAttribute(attr.name);
             }
-          });
-        });
+          }
+        }
         return clone;
       };
 
@@ -42,12 +44,12 @@ export function createSnapshotGetter(evalInPage: EvalInPage) {
           return [];
         }
         const attrs: [string, string][] = [];
-        Array.from(element.attributes).forEach((attr) => {
+        for (const attr of Array.from(element.attributes)) {
           if (shouldSkipAttribute(attr.name, attr.value)) {
-            return;
+            continue;
           }
           attrs.push([attr.name, attr.value]);
-        });
+        }
         return attrs;
       };
 

@@ -13,7 +13,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "echo \"no tests\""
+    "test": "echo \"no tests\"",
+    "lint": "biome lint \"src\""
   },
   "exports": {
     ".": {

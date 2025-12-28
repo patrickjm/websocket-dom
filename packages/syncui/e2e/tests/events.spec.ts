@@ -288,9 +288,9 @@ test("should dispatch supported event types", async ({ page }) => {
     area.dispatchEvent(
       new MouseEvent("contextmenu", { bubbles: true, cancelable: true })
     );
-    if (typeof (window as any).WheelEvent === "function") {
+    if (typeof window.WheelEvent === "function") {
       area.dispatchEvent(
-        new (window as any).WheelEvent("wheel", {
+        new window.WheelEvent("wheel", {
           bubbles: true,
           cancelable: true,
           deltaY: 10,
@@ -334,10 +334,10 @@ test("should dispatch supported event types", async ({ page }) => {
       "drop",
       "dragend",
     ];
-    dragEvents.forEach((type) => {
-      if (typeof (window as any).DragEvent === "function") {
+    for (const type of dragEvents) {
+      if (typeof window.DragEvent === "function") {
         area.dispatchEvent(
-          new (window as any).DragEvent(type, {
+          new window.DragEvent(type, {
             bubbles: true,
             cancelable: true,
           })
@@ -347,7 +347,7 @@ test("should dispatch supported event types", async ({ page }) => {
           new Event(type, { bubbles: true, cancelable: true })
         );
       }
-    });
+    }
   });
   await expect(page.locator("#events")).toHaveAttribute(
     "data-events",

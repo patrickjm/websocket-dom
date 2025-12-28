@@ -18,7 +18,7 @@ import {
   SetProperty,
   type DomEmitter,
 } from "syncui/core/ops/instructions";
-import { NodeStash } from "syncui/core/model/nodes";
+import type { NodeStash } from "syncui/core/model/nodes";
 import {
   hasUnsafeHtml,
   isScriptElement,
@@ -31,11 +31,12 @@ export function extendPrototypes(
   nodes: NodeStash,
   emitter: DomEmitter
 ) {
+  const ctorWindow = window as Window & typeof globalThis;
   const suppressedNodes = new WeakSet<Node>();
   const blockedPropertyNames = new Set(["innerHTML", "outerHTML"]);
 
   const isExecutableElement = (node: Node | null): boolean => {
-    if (!node || !(node instanceof window.Element)) {
+    if (!node || !(node instanceof ctorWindow.Element)) {
       return false;
     }
     return isScriptElement(node as Element);
@@ -73,7 +74,7 @@ export function extendPrototypes(
     if (isTargetSuppressed(element)) {
       const htmlElement = element as HTMLElement;
       const isEditable =
-        htmlElement instanceof window.HTMLElement &&
+        htmlElement instanceof ctorWindow.HTMLElement &&
         (htmlElement.isContentEditable ||
           htmlElement.getAttribute("contenteditable") !== null);
       if (
@@ -105,8 +106,10 @@ export function extendPrototypes(
     );
   };
 
-  const originalAppendChild = window.Node.prototype.appendChild;
-  window.Node.prototype.appendChild = function <T extends Node>(child: T): T {
+  const originalAppendChild = ctorWindow.Node.prototype.appendChild;
+  ctorWindow.Node.prototype.appendChild = function <T extends Node>(
+    child: T
+  ): T {
     const parentRef = nodes.findRefFor(this as Node | Element);
     const ret = originalAppendChild.call(this, child);
     if (isSuppressedNode(child)) {
@@ -122,8 +125,8 @@ export function extendPrototypes(
     return ret as T;
   };
 
-  const originalInsertBefore = window.Node.prototype.insertBefore;
-  window.Node.prototype.insertBefore = function <T extends Node>(
+  const originalInsertBefore = ctorWindow.Node.prototype.insertBefore;
+  ctorWindow.Node.prototype.insertBefore = function <T extends Node>(
     newChild: T,
     referenceChild: Node | null
   ): T {
@@ -154,8 +157,8 @@ export function extendPrototypes(
     return ret as T;
   };
 
-  const originalReplaceChild = window.Node.prototype.replaceChild;
-  window.Node.prototype.replaceChild = function <T extends Node>(
+  const originalReplaceChild = ctorWindow.Node.prototype.replaceChild;
+  ctorWindow.Node.prototype.replaceChild = function <T extends Node>(
     newChild: Node,
     oldChild: T
   ): T {
@@ -184,8 +187,10 @@ export function extendPrototypes(
     return ret as T;
   };
 
-  const originalRemoveChild = window.Node.prototype.removeChild;
-  window.Node.prototype.removeChild = function <T extends Node>(child: T): T {
+  const originalRemoveChild = ctorWindow.Node.prototype.removeChild;
+  ctorWindow.Node.prototype.removeChild = function <T extends Node>(
+    child: T
+  ): T {
     const parentRef = nodes.findRefFor(this as Node | Element);
     const ret = originalRemoveChild.call(this, child);
     if (isSuppressedNode(child)) {
@@ -201,8 +206,8 @@ export function extendPrototypes(
     return ret as T;
   };
 
-  const originalCloneNode = window.Node.prototype.cloneNode;
-  window.Node.prototype.cloneNode = function (deep: boolean) {
+  const originalCloneNode = ctorWindow.Node.prototype.cloneNode;
+  ctorWindow.Node.prototype.cloneNode = function (deep: boolean) {
     const ret = originalCloneNode.call(this, deep);
     const ref = nodes.stash(ret);
     emitter.emit(
@@ -213,8 +218,8 @@ export function extendPrototypes(
   };
 
   const originalInsertAdjacentElement =
-    window.Element.prototype.insertAdjacentElement;
-  window.Element.prototype.insertAdjacentElement = function (
+    ctorWindow.Element.prototype.insertAdjacentElement;
+  ctorWindow.Element.prototype.insertAdjacentElement = function (
     where: InsertPosition,
     element: Element
   ): Element | null {
@@ -234,8 +239,8 @@ export function extendPrototypes(
   };
 
   const originalInsertAdjacentHTML =
-    window.Element.prototype.insertAdjacentHTML;
-  window.Element.prototype.insertAdjacentHTML = function (
+    ctorWindow.Element.prototype.insertAdjacentHTML;
+  ctorWindow.Element.prototype.insertAdjacentHTML = function (
     where: InsertPosition,
     html: string
   ): void {
@@ -253,8 +258,8 @@ export function extendPrototypes(
   };
 
   const originalInsertAdjacentText =
-    window.Element.prototype.insertAdjacentText;
-  window.Element.prototype.insertAdjacentText = function (
+    ctorWindow.Element.prototype.insertAdjacentText;
+  ctorWindow.Element.prototype.insertAdjacentText = function (
     where: InsertPosition,
     text: string
   ): void {
@@ -268,8 +273,8 @@ export function extendPrototypes(
     }
   };
 
-  const originalNormalize = window.Node.prototype.normalize;
-  window.Node.prototype.normalize = function (): void {
+  const originalNormalize = ctorWindow.Node.prototype.normalize;
+  ctorWindow.Node.prototype.normalize = function (): void {
     originalNormalize.call(this);
     const ref = nodes.findRefFor(this as Node);
     if (ref) {
@@ -277,17 +282,17 @@ export function extendPrototypes(
     }
   };
 
-  const originalPrepend = window.Element.prototype.prepend;
-  window.Element.prototype.prepend = function (
+  const originalPrepend = ctorWindow.Element.prototype.prepend;
+  ctorWindow.Element.prototype.prepend = function (
     ...args: (Node | string)[]
   ): void {
     originalPrepend.apply(this, args);
     const parentRef = nodes.findRefFor(this as Node | Element);
     if (parentRef) {
-      args.forEach((node) => {
+      for (const node of args) {
         if (node instanceof Node) {
           if (isSuppressedNode(node)) {
-            return;
+            continue;
           }
           const childRef = nodes.findRefFor(node as Node | Element);
           if (childRef && childRef.type === "stashed-id") {
@@ -302,15 +307,15 @@ export function extendPrototypes(
             PrependChild.serialize({ parent: parentRef, child: node })
           );
         }
-      });
+      }
     }
   };
 
   const classAttributeSuppressed = new WeakSet<Element>();
   const styleAttributeSuppressed = new WeakSet<Element>();
 
-  const originalSetAttribute = window.Element.prototype.setAttribute;
-  window.Element.prototype.setAttribute = function (
+  const originalSetAttribute = ctorWindow.Element.prototype.setAttribute;
+  ctorWindow.Element.prototype.setAttribute = function (
     name: string,
     value: string
   ) {
@@ -331,8 +336,8 @@ export function extendPrototypes(
     return ret;
   };
 
-  const originalRemoveAttribute = window.Element.prototype.removeAttribute;
-  window.Element.prototype.removeAttribute = function (name: string) {
+  const originalRemoveAttribute = ctorWindow.Element.prototype.removeAttribute;
+  ctorWindow.Element.prototype.removeAttribute = function (name: string) {
     const ret = originalRemoveAttribute.call(this, name);
     const ref = nodes.findRefFor(this as Node | Element);
     if (ref) {
@@ -352,8 +357,8 @@ export function extendPrototypes(
   };
 
   // Extend Document prototype
-  const originalCreateElement = window.Document.prototype.createElement;
-  window.Document.prototype.createElement = function (
+  const originalCreateElement = ctorWindow.Document.prototype.createElement;
+  ctorWindow.Document.prototype.createElement = function (
     tagName: string,
     options?: ElementCreationOptions
   ): HTMLElement {
@@ -370,8 +375,8 @@ export function extendPrototypes(
     return element;
   };
 
-  const originalCreateTextNode = window.Document.prototype.createTextNode;
-  window.Document.prototype.createTextNode = function (data: string): Text {
+  const originalCreateTextNode = ctorWindow.Document.prototype.createTextNode;
+  ctorWindow.Document.prototype.createTextNode = function (data: string): Text {
     console.log("document: create text node", data);
     const textNode = originalCreateTextNode.call(this, data);
     const ref = nodes.stash(textNode);
@@ -383,8 +388,8 @@ export function extendPrototypes(
   };
 
   const originalCreateDocumentFragment =
-    window.Document.prototype.createDocumentFragment;
-  window.Document.prototype.createDocumentFragment =
+    ctorWindow.Document.prototype.createDocumentFragment;
+  ctorWindow.Document.prototype.createDocumentFragment =
     function (): DocumentFragment {
       const fragment = originalCreateDocumentFragment.call(this);
       const ref = nodes.stash(fragment);
@@ -397,30 +402,30 @@ export function extendPrototypes(
 
   // Override normal properties
   function extendPrototypeProperties(
-    prototype: any,
+    prototype: object,
     nodes: NodeStash,
     emitter: DomEmitter
   ) {
-    Object.getOwnPropertyNames(prototype).forEach((prop) => {
+    for (const prop of Object.getOwnPropertyNames(prototype)) {
       const descriptor = Object.getOwnPropertyDescriptor(prototype, prop);
-      if (descriptor && descriptor.set) {
+      if (descriptor?.set) {
         const originalSetter = descriptor.set;
         Object.defineProperty(prototype, prop, {
           ...descriptor,
-          set(this: Element, value: any) {
+          set(this: Element, value: unknown) {
             originalSetter.call(this, value);
             emitProperty(this, prop, value);
           },
         });
-      } else if (descriptor && descriptor.writable) {
+      } else if (descriptor?.writable) {
         // Add handling for regular writable properties
         const originalValue = descriptor.value;
         const prefix = "___";
         Object.defineProperty(prototype, prop, {
-          get() {
+          get(this: Element & Record<string, unknown>) {
             return this[prefix + prop] || originalValue;
           },
-          set(value: any) {
+          set(this: Element & Record<string, unknown>, value: unknown) {
             this[prefix + prop] = value;
             emitProperty(this, prop, value);
           },
@@ -428,29 +433,49 @@ export function extendPrototypes(
           enumerable: true,
         });
       }
-    });
+    }
   }
 
-  extendPrototypeProperties(window.Node.prototype, nodes, emitter);
-  extendPrototypeProperties(window.Element.prototype, nodes, emitter);
-  extendPrototypeProperties(window.Text.prototype, nodes, emitter);
-  extendPrototypeProperties(window.HTMLElement.prototype, nodes, emitter);
-  extendPrototypeProperties(window.HTMLInputElement.prototype, nodes, emitter);
+  extendPrototypeProperties(ctorWindow.Node.prototype, nodes, emitter);
+  extendPrototypeProperties(ctorWindow.Element.prototype, nodes, emitter);
+  extendPrototypeProperties(ctorWindow.Text.prototype, nodes, emitter);
+  extendPrototypeProperties(ctorWindow.HTMLElement.prototype, nodes, emitter);
   extendPrototypeProperties(
-    window.HTMLTextAreaElement.prototype,
+    ctorWindow.HTMLInputElement.prototype,
     nodes,
     emitter
   );
-  extendPrototypeProperties(window.HTMLButtonElement.prototype, nodes, emitter);
-  extendPrototypeProperties(window.HTMLAnchorElement.prototype, nodes, emitter);
-  extendPrototypeProperties(window.HTMLImageElement.prototype, nodes, emitter);
-  extendPrototypeProperties(window.HTMLFormElement.prototype, nodes, emitter);
+  extendPrototypeProperties(
+    ctorWindow.HTMLTextAreaElement.prototype,
+    nodes,
+    emitter
+  );
+  extendPrototypeProperties(
+    ctorWindow.HTMLButtonElement.prototype,
+    nodes,
+    emitter
+  );
+  extendPrototypeProperties(
+    ctorWindow.HTMLAnchorElement.prototype,
+    nodes,
+    emitter
+  );
+  extendPrototypeProperties(
+    ctorWindow.HTMLImageElement.prototype,
+    nodes,
+    emitter
+  );
+  extendPrototypeProperties(
+    ctorWindow.HTMLFormElement.prototype,
+    nodes,
+    emitter
+  );
 
   const innerTextTargets: object[] = [
-    window.HTMLElement.prototype,
-    window.Element.prototype,
+    ctorWindow.HTMLElement.prototype,
+    ctorWindow.Element.prototype,
   ];
-  innerTextTargets.forEach((prototype) => {
+  for (const prototype of innerTextTargets) {
     const innerTextDescriptor = Object.getOwnPropertyDescriptor(
       prototype,
       "innerText"
@@ -476,17 +501,17 @@ export function extendPrototypes(
       configurable: true,
       enumerable: true,
     });
-  });
+  }
 
   const tokenListElements = new WeakMap<DOMTokenList, Element>();
   const styleElements = new WeakMap<CSSStyleDeclaration, Element>();
 
   const classListDescriptor = Object.getOwnPropertyDescriptor(
-    window.Element.prototype,
+    ctorWindow.Element.prototype,
     "classList"
   );
   if (classListDescriptor?.get) {
-    Object.defineProperty(window.Element.prototype, "classList", {
+    Object.defineProperty(ctorWindow.Element.prototype, "classList", {
       ...classListDescriptor,
       get(this: Element) {
         const list = classListDescriptor.get?.call(this) as DOMTokenList;
@@ -499,11 +524,11 @@ export function extendPrototypes(
   }
 
   const stylePropertyDescriptor = Object.getOwnPropertyDescriptor(
-    window.HTMLElement.prototype,
+    ctorWindow.HTMLElement.prototype,
     "style"
   );
   if (stylePropertyDescriptor?.get) {
-    Object.defineProperty(window.HTMLElement.prototype, "style", {
+    Object.defineProperty(ctorWindow.HTMLElement.prototype, "style", {
       ...stylePropertyDescriptor,
       get(this: HTMLElement) {
         const style = stylePropertyDescriptor.get?.call(
@@ -555,8 +580,8 @@ export function extendPrototypes(
     }
   };
 
-  const originalTokenListAdd = window.DOMTokenList.prototype.add;
-  window.DOMTokenList.prototype.add = function (...tokens: string[]): void {
+  const originalTokenListAdd = ctorWindow.DOMTokenList.prototype.add;
+  ctorWindow.DOMTokenList.prototype.add = function (...tokens: string[]): void {
     const element = getTokenListElement(this);
     if (element && element.classList === this) {
       classAttributeSuppressed.add(element);
@@ -568,8 +593,10 @@ export function extendPrototypes(
     }
   };
 
-  const originalTokenListRemove = window.DOMTokenList.prototype.remove;
-  window.DOMTokenList.prototype.remove = function (...tokens: string[]): void {
+  const originalTokenListRemove = ctorWindow.DOMTokenList.prototype.remove;
+  ctorWindow.DOMTokenList.prototype.remove = function (
+    ...tokens: string[]
+  ): void {
     const element = getTokenListElement(this);
     if (element && element.classList === this) {
       classAttributeSuppressed.add(element);
@@ -581,8 +608,8 @@ export function extendPrototypes(
     }
   };
 
-  const originalTokenListToggle = window.DOMTokenList.prototype.toggle;
-  window.DOMTokenList.prototype.toggle = function (
+  const originalTokenListToggle = ctorWindow.DOMTokenList.prototype.toggle;
+  ctorWindow.DOMTokenList.prototype.toggle = function (
     token: string,
     force?: boolean
   ): boolean {
@@ -597,9 +624,9 @@ export function extendPrototypes(
     return originalTokenListToggle.call(this, token, force);
   };
 
-  const originalTokenListReplace = window.DOMTokenList.prototype.replace;
+  const originalTokenListReplace = ctorWindow.DOMTokenList.prototype.replace;
   if (typeof originalTokenListReplace === "function") {
-    window.DOMTokenList.prototype.replace = function (
+    ctorWindow.DOMTokenList.prototype.replace = function (
       token: string,
       newToken: string
     ): boolean {
@@ -654,8 +681,8 @@ export function extendPrototypes(
   };
 
   const originalStyleSetProperty =
-    window.CSSStyleDeclaration.prototype.setProperty;
-  window.CSSStyleDeclaration.prototype.setProperty = function (
+    ctorWindow.CSSStyleDeclaration.prototype.setProperty;
+  ctorWindow.CSSStyleDeclaration.prototype.setProperty = function (
     property: string,
     value: string | null,
     priority?: string
@@ -663,7 +690,7 @@ export function extendPrototypes(
     const element = getStyleElement(this);
     if (
       element &&
-      element instanceof window.HTMLElement &&
+      element instanceof ctorWindow.HTMLElement &&
       (element as HTMLElement).style === this
     ) {
       styleAttributeSuppressed.add(element);
@@ -676,14 +703,14 @@ export function extendPrototypes(
   };
 
   const originalStyleRemoveProperty =
-    window.CSSStyleDeclaration.prototype.removeProperty;
-  window.CSSStyleDeclaration.prototype.removeProperty = function (
+    ctorWindow.CSSStyleDeclaration.prototype.removeProperty;
+  ctorWindow.CSSStyleDeclaration.prototype.removeProperty = function (
     property: string
   ): string {
     const element = getStyleElement(this);
     if (
       element &&
-      element instanceof window.HTMLElement &&
+      element instanceof ctorWindow.HTMLElement &&
       (element as HTMLElement).style === this
     ) {
       styleAttributeSuppressed.add(element);
@@ -696,17 +723,17 @@ export function extendPrototypes(
   };
 
   const styleTextDescriptor = Object.getOwnPropertyDescriptor(
-    window.CSSStyleDeclaration.prototype,
+    ctorWindow.CSSStyleDeclaration.prototype,
     "cssText"
   );
   if (styleTextDescriptor?.set) {
-    Object.defineProperty(window.CSSStyleDeclaration.prototype, "cssText", {
+    Object.defineProperty(ctorWindow.CSSStyleDeclaration.prototype, "cssText", {
       ...styleTextDescriptor,
       set(this: CSSStyleDeclaration, value: string) {
         const element = getStyleElement(this);
         if (
           element &&
-          element instanceof window.HTMLElement &&
+          element instanceof ctorWindow.HTMLElement &&
           (element as HTMLElement).style === this
         ) {
           styleAttributeSuppressed.add(element);
