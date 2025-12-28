@@ -1,10 +1,11 @@
 import EventEmitter from "events";
 import type TypedEmitter from "typed-emitter";
-import { WebSocket } from "ws";
 import type { SerializedEvent } from "./core/protocol/events";
 import { createDom } from "./dom";
 import { type Serialized } from "./core/ops/instructions";
 import type { InstructionMessage, Message } from "./core/protocol/messages";
+import type { UiAdapter, UiAdapterFactory } from "./core/adapter/types";
+import type { TransportConnection } from "./core/transport/types";
 
 export type {
   BaseSerializedEvent,
@@ -17,7 +18,10 @@ export type {
   SerializedMouseEvent,
   SerializedSubmitEvent,
 } from "./core/protocol/events";
+export type { UiAdapter, UiAdapterFactory } from "./core/adapter/types";
+export type { TransportConnection } from "./core/transport/types";
 export { getXPath } from "./shared-utils";
+export { createWebSocketServerTransport } from "./transport/ws-server";
 
 export type WebsocketDomEvents = {
   clientEvent: (event: SerializedEvent) => void;
@@ -26,30 +30,36 @@ export type WebsocketDomEvents = {
 export type WebsocketDomOptions = {
   htmlDocument: string;
   url: string;
+  adapter?: UiAdapterFactory;
 };
 
 type ConnectionState = {
-  ws: WebSocket;
+  transport: TransportConnection;
   clientReady: boolean;
   snapshotSent: boolean;
   snapshotInFlight: Promise<void> | null;
   pending: Serialized[];
   batch: Serialized[];
   flushTimer: ReturnType<typeof setTimeout> | null;
-  messageHandler: (buffer: Buffer) => void;
-  closeHandler: () => void;
+  messageUnsubscribe: () => void;
+  closeUnsubscribe: () => void;
 };
 
 export class WebsocketDOM {
-  private readonly dom: ReturnType<typeof createDom>;
+  private readonly dom: UiAdapter;
   private readonly publicEmitter: TypedEmitter<WebsocketDomEvents>;
-  private readonly connections = new Map<WebSocket, ConnectionState>();
+  private readonly connections = new Map<
+    TransportConnection,
+    ConnectionState
+  >();
 
-  public readonly worker: ReturnType<typeof createDom>["worker"];
+  public readonly worker: UiAdapter["worker"];
 
   constructor(options: WebsocketDomOptions) {
-    const { htmlDocument, url } = options;
-    this.dom = createDom(htmlDocument, { url });
+    const { htmlDocument, url, adapter } = options;
+    this.dom = adapter
+      ? adapter(htmlDocument, { url })
+      : createDom(htmlDocument, { url });
     this.worker = this.dom.worker;
     this.publicEmitter = new EventEmitter() as TypedEmitter<WebsocketDomEvents>;
 
@@ -73,49 +83,47 @@ export class WebsocketDOM {
 
   isConnected() {
     for (const connection of this.connections.values()) {
-      if (connection.ws.readyState === WebSocket.OPEN) {
+      if (connection.transport.isOpen()) {
         return true;
       }
     }
     return false;
   }
 
-  addConnection(ws: WebSocket) {
-    if (this.connections.has(ws)) {
+  addConnection(transport: TransportConnection) {
+    if (this.connections.has(transport)) {
       return;
     }
     const connection: ConnectionState = {
-      ws,
+      transport,
       clientReady: false,
       snapshotSent: false,
       snapshotInFlight: null,
       pending: [],
       batch: [],
       flushTimer: null,
-      messageHandler: (buffer: Buffer) => {
-        this.handleMessage(connection, buffer);
-      },
-      closeHandler: () => {
-        this.removeConnection(ws);
-      },
+      messageUnsubscribe: transport.onMessage((data) => {
+        this.handleMessage(connection, data);
+      }),
+      closeUnsubscribe: transport.onClose(() => {
+        this.removeConnection(transport);
+      }),
     };
 
-    ws.on("message", connection.messageHandler);
-    ws.on("close", connection.closeHandler);
-    this.connections.set(ws, connection);
+    this.connections.set(transport, connection);
   }
 
-  removeConnection(ws: WebSocket) {
-    const connection = this.connections.get(ws);
+  removeConnection(transport: TransportConnection) {
+    const connection = this.connections.get(transport);
     if (!connection) {
       return;
     }
-    ws.off("message", connection.messageHandler);
-    ws.off("close", connection.closeHandler);
+    connection.messageUnsubscribe();
+    connection.closeUnsubscribe();
     if (connection.flushTimer !== null) {
       clearTimeout(connection.flushTimer);
     }
-    this.connections.delete(ws);
+    this.connections.delete(transport);
   }
 
   import(url: string) {
@@ -136,13 +144,16 @@ export class WebsocketDOM {
   }
 
   postWorkerMessage(message: unknown): void {
+    if (!this.worker) {
+      throw new Error("No worker is available for this adapter.");
+    }
     this.worker.postMessage(message as any);
   }
 
   terminate(): void {
     for (const connection of this.connections.values()) {
-      if (connection.ws.readyState === WebSocket.OPEN) {
-        connection.ws.close();
+      if (connection.transport.isOpen()) {
+        connection.transport.close();
       }
       if (connection.flushTimer !== null) {
         clearTimeout(connection.flushTimer);
@@ -162,7 +173,7 @@ export class WebsocketDOM {
     if (connection.snapshotInFlight) {
       return connection.snapshotInFlight;
     }
-    if (connection.ws.readyState !== WebSocket.OPEN) {
+    if (!connection.transport.isOpen()) {
       return Promise.resolve();
     }
     if (!force) {
@@ -170,7 +181,7 @@ export class WebsocketDOM {
     }
     connection.snapshotInFlight = (async () => {
       const snapshot = await this.dom.getSnapshot();
-      connection.ws.send(JSON.stringify(snapshot));
+      connection.transport.send(JSON.stringify(snapshot));
     })().finally(() => {
       connection.snapshotInFlight = null;
     });
@@ -182,12 +193,12 @@ export class WebsocketDOM {
     if (connection.batch.length === 0) {
       return;
     }
-    if (connection.ws.readyState !== WebSocket.OPEN) {
+    if (!connection.transport.isOpen()) {
       return;
     }
     const instr = connection.batch.slice();
     connection.batch = [];
-    connection.ws.send(
+    connection.transport.send(
       JSON.stringify({
         type: "instructions",
         instructions: instr,
@@ -195,8 +206,8 @@ export class WebsocketDOM {
     );
   }
 
-  private handleMessage(connection: ConnectionState, buffer: Buffer) {
-    const message = JSON.parse(buffer.toString()) as Message;
+  private handleMessage(connection: ConnectionState, data: string) {
+    const message = JSON.parse(data) as Message;
     if (message.type === "ready") {
       if (connection.clientReady) {
         void this.sendSnapshot(connection, false);

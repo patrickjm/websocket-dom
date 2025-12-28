@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-test("should reconnect and request resync after disconnect", async ({ page }) => {
+test("should reconnect and request resync after disconnect", async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     (window as any).__wsSendLog = [];
     (window as any).__wsInstances = [];
@@ -38,19 +40,15 @@ test("should reconnect and request resync after disconnect", async ({ page }) =>
   );
 
   await page.evaluate(() => {
-    (window as any).ws.close();
+    const client = (window as any).wsdomClient;
+    client?.transport?.close();
   });
 
-  await page.waitForFunction(
-    () => (window as any).__wsInstances?.length >= 2
-  );
+  await page.waitForFunction(() => (window as any).__wsInstances?.length >= 2);
   await page.waitForFunction(() => {
-    const ws = (window as any).ws as WebSocket;
     const client = (window as any).wsdomClient;
     return (
-      ws &&
-      ws.readyState === WebSocket.OPEN &&
-      client?.state?.snapshotApplied === true
+      client?.transport?.isOpen?.() && client?.state?.snapshotApplied === true
     );
   });
 

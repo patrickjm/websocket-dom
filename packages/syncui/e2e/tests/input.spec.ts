@@ -211,8 +211,8 @@ test("should simulate keyboard input when only keydown arrives", async ({
   await page.waitForSelector("#simulate-input");
 
   await page.evaluate(() => {
-    const ws = (window as any).ws as WebSocket;
-    ws.send(
+    const client = (window as any).wsdomClient;
+    client?.transport?.send(
       JSON.stringify({
         type: "event",
         event: {

@@ -3,6 +3,8 @@ import { NodeStash } from "../core/model/nodes";
 import { debounce } from "../shared-utils";
 import { serializeEvent } from "./events";
 import * as Instr from "../core/ops/instructions";
+import type { TransportConnection } from "../core/transport/types";
+import { createWebSocketClientTransport } from "../transport/ws-client";
 
 /**
  * Creates a client that connects to a syncui server and starts the sync.
@@ -21,7 +23,7 @@ export type ClientOptions = {
 };
 
 export type WebsocketDomClient = {
-  ws: WebSocket | null;
+  transport: TransportConnection | null;
   state: {
     snapshotApplied: boolean;
     lastMessageType: string;
@@ -45,7 +47,7 @@ export function createClient(
     maxDelayMs: options.reconnect?.maxDelayMs ?? 10_000,
     jitterRatio: options.reconnect?.jitterRatio ?? 0.2,
   };
-  let ws: WebSocket | null = null;
+  let transport: TransportConnection | null = null;
   const nodes = new NodeStash(window);
   console.log("nodes", nodes);
   let readyInterval: number | null = null;
@@ -62,10 +64,10 @@ export function createClient(
   };
 
   const sendPayload = (payload: unknown) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
+    if (!transport || !transport.isOpen()) {
       return false;
     }
-    ws.send(JSON.stringify(payload));
+    transport.send(JSON.stringify(payload));
     return true;
   };
 
@@ -98,10 +100,10 @@ export function createClient(
     }, delay);
   };
 
-  const handleMessage = (event: MessageEvent) => {
-    const data = JSON.parse(event.data) as Message;
-    state.lastMessageType = data.type;
-    if (data.type === "snapshot") {
+  const handleMessage = (data: string) => {
+    const message = JSON.parse(data) as Message;
+    state.lastMessageType = message.type;
+    if (message.type === "snapshot") {
       state.snapshotApplied = true;
       const applyAttributes = (
         element: Element | null,
@@ -114,17 +116,17 @@ export function createClient(
           element.setAttribute(name, value);
         });
       };
-      applyAttributes(document.documentElement, data.htmlAttributes);
-      applyAttributes(document.head, data.headAttributes);
-      applyAttributes(document.body, data.bodyAttributes);
+      applyAttributes(document.documentElement, message.htmlAttributes);
+      applyAttributes(document.head, message.headAttributes);
+      applyAttributes(document.body, message.bodyAttributes);
       if (document.head) {
-        document.head.innerHTML = data.headHtml;
+        document.head.innerHTML = message.headHtml;
       }
       if (document.body) {
-        document.body.innerHTML = data.bodyHtml;
+        document.body.innerHTML = message.bodyHtml;
       }
-    } else if (data.type === "instructions") {
-      for (const instruction of data.instructions) {
+    } else if (message.type === "instructions") {
+      for (const instruction of message.instructions) {
         const [type] = instruction;
         switch (type) {
           case Instr.InstructionType.CreateElement:
@@ -257,8 +259,8 @@ export function createClient(
             break;
         }
       }
-    } else if (data.type === "error") {
-      console.error(data.error, data.errorInfo);
+    } else if (message.type === "error") {
+      console.error(message.error, message.errorInfo);
     }
   };
 
@@ -267,12 +269,13 @@ export function createClient(
       return;
     }
     state.snapshotApplied = false;
-    const nextWs = new WebSocket(url);
-    ws = nextWs;
-    client.ws = nextWs;
-    nextWs.onmessage = handleMessage;
+    const nextTransport = createWebSocketClientTransport(url);
+    transport = nextTransport;
+    client.transport = nextTransport;
+    const messageUnsub = nextTransport.onMessage(handleMessage);
+    let closeUnsub: (() => void) | null = null;
 
-    nextWs.addEventListener("open", () => {
+    nextTransport.onOpen?.(() => {
       reconnectAttempts = 0;
       state.reconnectAttempts = 0;
       state.reconnecting = false;
@@ -296,23 +299,20 @@ export function createClient(
       connectedOnce = true;
       console.log("Connection opened");
     });
-
-    if (nextWs.readyState === WebSocket.OPEN) {
-      sendReady();
-    }
-
-    nextWs.onerror = (error) => {
+    nextTransport.onError?.((error) => {
       console.error("WebSocket error:", error);
-    };
-
-    nextWs.onclose = () => {
+    });
+    closeUnsub = nextTransport.onClose(() => {
+      messageUnsub();
+      closeUnsub?.();
+      closeUnsub = null;
       if (readyInterval !== null) {
         clearInterval(readyInterval);
         readyInterval = null;
       }
       console.log("Connection closed");
       scheduleReconnect();
-    };
+    });
   };
 
   const close = () => {
@@ -325,8 +325,8 @@ export function createClient(
       clearInterval(readyInterval);
       readyInterval = null;
     }
-    if (ws && ws.readyState !== WebSocket.CLOSED) {
-      ws.close();
+    if (transport) {
+      transport.close();
     }
   };
 
@@ -433,7 +433,7 @@ export function createClient(
   );
 
   const client: WebsocketDomClient = {
-    ws,
+    transport,
     state,
     resync,
     close,

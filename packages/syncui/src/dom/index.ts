@@ -1,5 +1,6 @@
 import { EventEmitter } from "events";
 import { createRequire } from "module";
+import type { UiAdapter } from "../core/adapter/types";
 import type { SerializedEvent } from "../core/protocol/events";
 import { type DomEmitter } from "../core/ops/instructions";
 import { type MessageFromWorker, type MessageToWorker } from "./utils";
@@ -10,7 +11,7 @@ const require = createRequire(import.meta.url);
 const WebWorker = require("web-worker");
 const WorkerCtor: typeof WebWorker = WebWorker.default ?? WebWorker;
 
-export function createDom(doc: string, { url }: { url: string }) {
+export function createDom(doc: string, { url }: { url: string }): UiAdapter {
   const emitter = new EventEmitter() as DomEmitter;
   const worker = new WorkerCtor(
     new URL("./worker.js", import.meta.url).toString()

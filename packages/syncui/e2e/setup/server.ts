@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
 import { WebsocketDOM } from "../../src";
+import { createWebSocketServerTransport } from "../../src/transport/ws-server";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,7 +28,7 @@ export class TestServer {
       const url = new URL(request.url ?? "/", `http://localhost:${this.port}`);
       const sessionId = url.searchParams.get("session") ?? "default";
       const wsDom = this.getSession(sessionId);
-      wsDom.addConnection(ws);
+      wsDom.addConnection(createWebSocketServerTransport(ws));
 
       ws.on("message", (data) => {
         const message = JSON.parse(data.toString());

@@ -138,8 +138,8 @@ test("should sync initial head/body/html state without scripts", async ({
   await page.goto("/");
 
   await page.waitForFunction(() => {
-    const ws = (window as any).ws as WebSocket | undefined;
-    return !!ws && ws.readyState === WebSocket.OPEN;
+    const client = (window as any).wsdomClient;
+    return !!client?.transport?.isOpen?.();
   });
   await page.waitForFunction(() => {
     const title = document.head?.querySelector("title");
@@ -161,8 +161,8 @@ test("should resync snapshot on demand", async ({ page }) => {
   await page.evaluate(() => {
     document.title = "Client Title";
     document.body.setAttribute("data-state", "client");
-    const ws = (window as any).ws as WebSocket;
-    ws.send(JSON.stringify({ type: "resync" }));
+    const client = (window as any).wsdomClient;
+    client?.transport?.send(JSON.stringify({ type: "resync" }));
   });
 
   await page.waitForFunction(() => document.title === "Server Title");

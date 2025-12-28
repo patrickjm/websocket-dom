@@ -37,7 +37,7 @@ document.body.appendChild(btn);
 Then set up the server (assuming you're using Express):
 
 ```ts
-import { WebsocketDOM } from 'syncui';
+import { WebsocketDOM, createWebSocketServerTransport } from 'syncui';
 import http from 'http';
 import express from 'express';
 import { WebSocketServer } from 'ws';
@@ -55,7 +55,7 @@ const wsDom = new WebsocketDOM({
 });
 
 wss.on('connection', (ws) => {
-  wsDom.addConnection(ws);
+  wsDom.addConnection(createWebSocketServerTransport(ws));
 });
 
 // This must be a relative path to the compiled worker.js file in the dist folder,
