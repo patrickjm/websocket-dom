@@ -37,7 +37,8 @@ document.body.appendChild(btn);
 Then set up the server (assuming you're using Express):
 
 ```ts
-import { WebsocketDOM, createWebSocketServerTransport } from 'syncui';
+import { WebsocketDOM } from 'syncui';
+import { createWebSocketServerTransport } from 'syncui/transport-ws/server';
 import { createDom } from 'syncui-dom/adapter-jsdom';
 import { JSDOM } from 'jsdom';
 import http from 'http';

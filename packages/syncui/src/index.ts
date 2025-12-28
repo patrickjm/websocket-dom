@@ -21,6 +21,7 @@ export type { UiAdapter, UiAdapterFactory } from "./core/adapter/types";
 export type { TransportConnection } from "./core/transport/types";
 export { getXPath } from "./shared-utils";
 export { createWebSocketServerTransport } from "./transport/ws-server";
+export { createWebSocketClientTransport } from "./transport/ws-client";
 
 export type WebsocketDomEvents = {
   clientEvent: (event: SerializedEvent) => void;

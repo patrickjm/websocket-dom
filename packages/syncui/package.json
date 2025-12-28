@@ -70,6 +70,14 @@
     "./core/transport/types": {
       "import": "./dist/core/transport/types.js",
       "types": "./dist/core/transport/types.d.ts"
+    },
+    "./transport-ws": {
+      "import": "./dist/transport/ws-client.js",
+      "types": "./dist/transport/ws-client.d.ts"
+    },
+    "./transport-ws/server": {
+      "import": "./dist/transport/ws-server.js",
+      "types": "./dist/transport/ws-server.d.ts"
     }
   },
   "packageManager": "yarn@1.22.22",

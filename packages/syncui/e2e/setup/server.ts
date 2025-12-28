@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
 import { WebsocketDOM } from "../../src";
-import { createWebSocketServerTransport } from "../../src/transport/ws-server";
+import { createWebSocketServerTransport } from "syncui/transport-ws/server";
 import { createDom } from "syncui-dom/adapter-jsdom";
 import { JSDOM } from "jsdom";
 

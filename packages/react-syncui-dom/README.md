@@ -15,7 +15,8 @@ yarn add react-syncui
 `loadReactWebsocketDOM` expects a small adapter with `import`, `on`, and `postWorkerMessage` methods. You can build one from `WebsocketDOM` like this:
 
 ```ts
-import { WebsocketDOM, createWebSocketServerTransport } from "syncui";
+import { WebsocketDOM } from "syncui";
+import { createWebSocketServerTransport } from "syncui/transport-ws/server";
 import { createDom } from "syncui-dom/adapter-jsdom";
 import { JSDOM } from "jsdom";
 import { loadReactWebsocketDOM } from "react-syncui";
