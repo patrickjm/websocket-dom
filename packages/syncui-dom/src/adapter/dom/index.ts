@@ -20,6 +20,7 @@ type GlobalScope = {
   XMLSerializer?: typeof XMLSerializer;
   XPathResult?: typeof XPathResult;
   XPathEvaluator?: typeof XPathEvaluator;
+  DOMParser?: typeof DOMParser;
   localStorage?: Storage;
   sessionStorage?: Storage;
 };
@@ -66,6 +67,7 @@ export function createJsdomAdapter(
     scope.XMLSerializer = dom.window.XMLSerializer;
     scope.XPathResult = dom.window.XPathResult;
     scope.XPathEvaluator = dom.window.XPathEvaluator;
+    scope.DOMParser = dom.window.DOMParser;
     scope.localStorage = localStorage;
     scope.sessionStorage = sessionStorage;
   };
@@ -82,6 +84,7 @@ export function createJsdomAdapter(
       XMLSerializer: scope.XMLSerializer,
       XPathResult: scope.XPathResult,
       XPathEvaluator: scope.XPathEvaluator,
+      DOMParser: scope.DOMParser,
       localStorage: scope.localStorage,
       sessionStorage: scope.sessionStorage,
     };
@@ -105,6 +108,7 @@ export function createJsdomAdapter(
       XMLSerializer: scope.XMLSerializer,
       XPathResult: scope.XPathResult,
       XPathEvaluator: scope.XPathEvaluator,
+      DOMParser: scope.DOMParser,
       localStorage: scope.localStorage,
       sessionStorage: scope.sessionStorage,
     };
