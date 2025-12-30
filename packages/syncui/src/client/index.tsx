@@ -2,7 +2,26 @@ import type { EventMessage, Message } from "../core/protocol/messages";
 import { NodeStash } from "../core/model/nodes";
 import { debounce } from "../shared-utils";
 import { serializeEvent } from "./events";
-import * as Instr from "../core/ops/instructions";
+import {
+  AppendChild,
+  CloneNode,
+  CreateDocumentFragment,
+  CreateElement,
+  CreateTextNode,
+  InsertAdjacentElement,
+  InsertAdjacentHTML,
+  InsertAdjacentText,
+  InsertBefore,
+  InstructionType,
+  Normalize,
+  PrependChild,
+  RemoveAttribute,
+  RemoveChild,
+  ReplaceChild,
+  SetAttribute,
+  SetProperty,
+  type Serialized as InstructionSerialized,
+} from "../core/ops/instructions";
 import type { TransportConnection } from "../core/transport/types";
 import { createWebSocketClientTransport } from "../transport/ws-client";
 
@@ -76,16 +95,10 @@ export class SyncUIClient {
       this.state.reconnecting = false;
       this.sendReady();
       if (this.readyInterval === null) {
-        this.readyInterval = window.setInterval(() => {
-          if (this.state.snapshotApplied) {
-            if (this.readyInterval !== null) {
-              clearInterval(this.readyInterval);
-              this.readyInterval = null;
-            }
-            return;
-          }
-          this.sendReady();
-        }, 250);
+        this.readyInterval = window.setInterval(
+          () => this.handleReadyIntervalTick(),
+          250
+        );
       }
       if (this.connectedOnce || this.state.pendingResync) {
         this.state.pendingResync = false;
@@ -128,7 +141,7 @@ export class SyncUIClient {
   }
 
   private sendPayload(payload: unknown) {
-    if (!this.transport || !this.transport.isOpen()) {
+    if (!this.transport?.isOpen()) {
       return false;
     }
     this.transport.send(JSON.stringify(payload));
@@ -153,7 +166,8 @@ export class SyncUIClient {
       this.reconnect.baseDelayMs * 2 ** this.reconnectAttempts,
       this.reconnect.maxDelayMs
     );
-    const jitter = baseDelay * this.reconnect.jitterRatio * (Math.random() * 2 - 1);
+    const jitter =
+      baseDelay * this.reconnect.jitterRatio * (Math.random() * 2 - 1);
     const delay = Math.max(0, baseDelay + jitter);
     this.reconnectAttempts += 1;
     this.state.reconnectAttempts = this.reconnectAttempts;
@@ -167,164 +181,168 @@ export class SyncUIClient {
   private handleMessage(data: string) {
     const message = JSON.parse(data) as Message;
     this.state.lastMessageType = message.type;
-    if (message.type === "snapshot") {
-      this.state.snapshotApplied = true;
-      const applyAttributes = (
-        element: Element | null,
-        attributes: [string, string][]
-      ) => {
-        if (!element) {
-          return;
-        }
-        for (const [name, value] of attributes) {
-          element.setAttribute(name, value);
-        }
-      };
-      applyAttributes(document.documentElement, message.htmlAttributes);
-      applyAttributes(document.head, message.headAttributes);
-      applyAttributes(document.body, message.bodyAttributes);
-      if (document.head) {
-        document.head.innerHTML = message.headHtml;
+    switch (message.type) {
+      case "snapshot":
+        this.applySnapshot(message);
+        break;
+      case "instructions":
+        this.applyInstructions(message.instructions);
+        break;
+      case "error":
+        console.error(message.error, message.errorInfo);
+        break;
+    }
+  }
+
+  private handleReadyIntervalTick() {
+    if (this.state.snapshotApplied) {
+      if (this.readyInterval !== null) {
+        clearInterval(this.readyInterval);
+        this.readyInterval = null;
       }
-      if (document.body) {
-        document.body.innerHTML = message.bodyHtml;
-      }
-    } else if (message.type === "instructions") {
-      for (const instruction of message.instructions) {
-        const [type] = instruction;
-        switch (type) {
-          case Instr.InstructionType.CreateElement:
-            Instr.CreateElement.apply(
-              { window, nodes: this.nodes },
-              Instr.CreateElement.deserialize(
-                instruction as Instr.CreateElement.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.SetAttribute:
-            Instr.SetAttribute.apply(
-              { window, nodes: this.nodes },
-              Instr.SetAttribute.deserialize(
-                instruction as Instr.SetAttribute.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.SetProperty:
-            Instr.SetProperty.apply(
-              { window, nodes: this.nodes },
-              Instr.SetProperty.deserialize(
-                instruction as Instr.SetProperty.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.AppendChild:
-            Instr.AppendChild.apply(
-              { window, nodes: this.nodes },
-              Instr.AppendChild.deserialize(
-                instruction as Instr.AppendChild.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.CreateDocumentFragment:
-            Instr.CreateDocumentFragment.apply(
-              { window, nodes: this.nodes },
-              Instr.CreateDocumentFragment.deserialize(
-                instruction as Instr.CreateDocumentFragment.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.CreateTextNode:
-            Instr.CreateTextNode.apply(
-              { window, nodes: this.nodes },
-              Instr.CreateTextNode.deserialize(
-                instruction as Instr.CreateTextNode.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.RemoveChild:
-            Instr.RemoveChild.apply(
-              { window, nodes: this.nodes },
-              Instr.RemoveChild.deserialize(
-                instruction as Instr.RemoveChild.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.CloneNode:
-            Instr.CloneNode.apply(
-              { window, nodes: this.nodes },
-              Instr.CloneNode.deserialize(
-                instruction as Instr.CloneNode.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.InsertAdjacentElement:
-            Instr.InsertAdjacentElement.apply(
-              { window, nodes: this.nodes },
-              Instr.InsertAdjacentElement.deserialize(
-                instruction as Instr.InsertAdjacentElement.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.InsertAdjacentHTML:
-            Instr.InsertAdjacentHTML.apply(
-              { window, nodes: this.nodes },
-              Instr.InsertAdjacentHTML.deserialize(
-                instruction as Instr.InsertAdjacentHTML.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.InsertAdjacentText:
-            Instr.InsertAdjacentText.apply(
-              { window, nodes: this.nodes },
-              Instr.InsertAdjacentText.deserialize(
-                instruction as Instr.InsertAdjacentText.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.PrependChild:
-            Instr.PrependChild.apply(
-              { window, nodes: this.nodes },
-              Instr.PrependChild.deserialize(
-                instruction as Instr.PrependChild.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.Normalize:
-            Instr.Normalize.apply(
-              { window, nodes: this.nodes },
-              Instr.Normalize.deserialize(
-                instruction as Instr.Normalize.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.InsertBefore:
-            Instr.InsertBefore.apply(
-              { window, nodes: this.nodes },
-              Instr.InsertBefore.deserialize(
-                instruction as Instr.InsertBefore.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.ReplaceChild:
-            Instr.ReplaceChild.apply(
-              { window, nodes: this.nodes },
-              Instr.ReplaceChild.deserialize(
-                instruction as Instr.ReplaceChild.Serialized
-              )
-            );
-            break;
-          case Instr.InstructionType.RemoveAttribute:
-            Instr.RemoveAttribute.apply(
-              { window, nodes: this.nodes },
-              Instr.RemoveAttribute.deserialize(
-                instruction as Instr.RemoveAttribute.Serialized
-              )
-            );
-            break;
-        }
-      }
-    } else if (message.type === "error") {
-      console.error(message.error, message.errorInfo);
+      return;
+    }
+    this.sendReady();
+  }
+
+  private applySnapshot(message: Message & { type: "snapshot" }) {
+    this.state.snapshotApplied = true;
+    this.applyAttributes(document.documentElement, message.htmlAttributes);
+    this.applyAttributes(document.head, message.headAttributes);
+    this.applyAttributes(document.body, message.bodyAttributes);
+    if (document.head) {
+      document.head.innerHTML = message.headHtml;
+    }
+    if (document.body) {
+      document.body.innerHTML = message.bodyHtml;
+    }
+  }
+
+  private applyAttributes(
+    element: Element | null,
+    attributes: [string, string][]
+  ) {
+    if (!element) {
+      return;
+    }
+    for (const [name, value] of attributes) {
+      element.setAttribute(name, value);
+    }
+  }
+
+  private applyInstructions(instructions: readonly InstructionSerialized[]) {
+    for (const instruction of instructions) {
+      this.applyInstruction(instruction);
+    }
+  }
+
+  private applyInstruction(instruction: InstructionSerialized) {
+    const [type] = instruction;
+    switch (type) {
+      case InstructionType.CreateElement:
+        CreateElement.apply(
+          { window, nodes: this.nodes },
+          CreateElement.deserialize(instruction as CreateElement.Serialized)
+        );
+        break;
+      case InstructionType.SetAttribute:
+        SetAttribute.apply(
+          { window, nodes: this.nodes },
+          SetAttribute.deserialize(instruction as SetAttribute.Serialized)
+        );
+        break;
+      case InstructionType.SetProperty:
+        SetProperty.apply(
+          { window, nodes: this.nodes },
+          SetProperty.deserialize(instruction as SetProperty.Serialized)
+        );
+        break;
+      case InstructionType.AppendChild:
+        AppendChild.apply(
+          { window, nodes: this.nodes },
+          AppendChild.deserialize(instruction as AppendChild.Serialized)
+        );
+        break;
+      case InstructionType.CreateDocumentFragment:
+        CreateDocumentFragment.apply(
+          { window, nodes: this.nodes },
+          CreateDocumentFragment.deserialize(
+            instruction as CreateDocumentFragment.Serialized
+          )
+        );
+        break;
+      case InstructionType.CreateTextNode:
+        CreateTextNode.apply(
+          { window, nodes: this.nodes },
+          CreateTextNode.deserialize(instruction as CreateTextNode.Serialized)
+        );
+        break;
+      case InstructionType.RemoveChild:
+        RemoveChild.apply(
+          { window, nodes: this.nodes },
+          RemoveChild.deserialize(instruction as RemoveChild.Serialized)
+        );
+        break;
+      case InstructionType.CloneNode:
+        CloneNode.apply(
+          { window, nodes: this.nodes },
+          CloneNode.deserialize(instruction as CloneNode.Serialized)
+        );
+        break;
+      case InstructionType.InsertAdjacentElement:
+        InsertAdjacentElement.apply(
+          { window, nodes: this.nodes },
+          InsertAdjacentElement.deserialize(
+            instruction as InsertAdjacentElement.Serialized
+          )
+        );
+        break;
+      case InstructionType.InsertAdjacentHTML:
+        InsertAdjacentHTML.apply(
+          { window, nodes: this.nodes },
+          InsertAdjacentHTML.deserialize(
+            instruction as InsertAdjacentHTML.Serialized
+          )
+        );
+        break;
+      case InstructionType.InsertAdjacentText:
+        InsertAdjacentText.apply(
+          { window, nodes: this.nodes },
+          InsertAdjacentText.deserialize(
+            instruction as InsertAdjacentText.Serialized
+          )
+        );
+        break;
+      case InstructionType.PrependChild:
+        PrependChild.apply(
+          { window, nodes: this.nodes },
+          PrependChild.deserialize(instruction as PrependChild.Serialized)
+        );
+        break;
+      case InstructionType.Normalize:
+        Normalize.apply(
+          { window, nodes: this.nodes },
+          Normalize.deserialize(instruction as Normalize.Serialized)
+        );
+        break;
+      case InstructionType.InsertBefore:
+        InsertBefore.apply(
+          { window, nodes: this.nodes },
+          InsertBefore.deserialize(instruction as InsertBefore.Serialized)
+        );
+        break;
+      case InstructionType.ReplaceChild:
+        ReplaceChild.apply(
+          { window, nodes: this.nodes },
+          ReplaceChild.deserialize(instruction as ReplaceChild.Serialized)
+        );
+        break;
+      case InstructionType.RemoveAttribute:
+        RemoveAttribute.apply(
+          { window, nodes: this.nodes },
+          RemoveAttribute.deserialize(instruction as RemoveAttribute.Serialized)
+        );
+        break;
     }
   }
 

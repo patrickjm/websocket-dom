@@ -129,7 +129,6 @@ test("should handle IME composition and beforeinput flow", async ({ page }) => {
   await importScript(page, script);
 
   await page.waitForSelector("#test-input");
-  const input = page.locator("#test-input");
   const output = page.locator("#output");
 
   await page.evaluate(() => {
@@ -273,8 +272,6 @@ test("should preserve focus/blur ordering across multiple inputs", async ({
   await importScript(page, focusScript);
 
   await page.waitForSelector("#input-a");
-  const inputA = page.locator("#input-a");
-  const inputB = page.locator("#input-b");
 
   await page.evaluate(() => {
     (document.querySelector("#input-a") as HTMLInputElement).focus();

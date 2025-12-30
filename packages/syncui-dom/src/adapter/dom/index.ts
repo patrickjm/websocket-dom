@@ -33,21 +33,28 @@ export type JsdomAdapterDeps = {
   JSDOM: typeof import("jsdom").JSDOM;
 };
 
+export type JsdomAdapterOptions = {
+  resources?: "usable" | "none";
+};
+
 export function createJsdomAdapter(
   doc: string,
   { url }: { url: string },
-  deps: JsdomAdapterDeps
+  deps: JsdomAdapterDeps,
+  options: JsdomAdapterOptions = {}
 ): UiAdapter {
   if (!deps?.JSDOM) {
     throw new Error("JSDOM dependency is required for adapter-server-jsdom.");
   }
+  const resources =
+    options.resources === "none" ? undefined : options.resources ?? "usable";
   const emitter = new EventEmitter() as DomEmitter;
   const dom = new deps.JSDOM(doc, {
     url,
     pretendToBeVisual: true,
     contentType: "text/html",
     runScripts: "outside-only",
-    resources: "usable",
+    resources,
   });
   const adapterWindow = dom.window as unknown as AdapterWindow;
   const nodes = new NodeStash(adapterWindow);
@@ -129,6 +136,7 @@ export function createJsdomAdapter(
   function domImport(moduleUrl: string) {
     void enqueueGlobals(() =>
       withGlobalsAsync(async () => {
+        // syncui-allow-inline-import: server adapter loads user worker modules on demand.
         await import(moduleUrl);
       })
     ).catch((err) => {
@@ -141,7 +149,15 @@ export function createJsdomAdapter(
   }
 
   async function evalString(code: string): Promise<unknown> {
-    return enqueueGlobals(async () => withGlobals(() => dom.window.eval(code)));
+    return enqueueGlobals(async () =>
+      withGlobals(async () => {
+        const result = dom.window.eval(code);
+        if (result && typeof (result as Promise<unknown>).then === "function") {
+          return await result;
+        }
+        return result;
+      })
+    );
   }
 
   function collectAttributes(element: Element | null): [string, string][] {

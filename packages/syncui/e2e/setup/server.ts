@@ -10,6 +10,7 @@ import { createPlaywrightAdapter } from "syncui-dom/adapter-server-playwright";
 import { JSDOM } from "jsdom";
 import { chromium, type Browser, type Page } from "@playwright/test";
 import type { UiAdapterFactory } from "../../src/core/adapter/types";
+import { ASSET_PROXY_SECRET } from "./asset-proxy";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,7 +30,7 @@ export class TestServer {
     this.app = express();
     this.server = http.createServer(this.app);
     this.wss = new WebSocketServer({ server: this.server });
-    this.port = 3333;
+    this.port = Number(process.env.SYNCUI_PORT ?? 3333);
     this.adapter =
       process.env.SYNCUI_ADAPTER === "playwright" ? "playwright" : "jsdom";
     this.baseDoc =
@@ -37,6 +38,27 @@ export class TestServer {
 
     this.wss.on("connection", (ws, request) => {
       void this.handleConnection(ws, request);
+    });
+
+    this.app.get("/syncui/:session/assets/*", async (req, res) => {
+      const sessionId = req.params.session;
+      const session = await this.getSession(sessionId);
+      const proxy = session.getAssetProxy();
+      if (!proxy) {
+        res.status(404).end("not found");
+        return;
+      }
+      await proxy.handler(req, res);
+    });
+
+    this.app.get("/test-assets/style.css", (_req, res) => {
+      res.type("text/css");
+      res.send("body{background:url('/test-assets/bg.png');}");
+    });
+
+    this.app.get("/test-assets/bg.png", (_req, res) => {
+      res.type("image/png");
+      res.send(Buffer.from([137, 80, 78, 71]));
     });
 
     this.app.use(express.static(path.join(__dirname, "../dist")));
@@ -48,13 +70,28 @@ export class TestServer {
   ) {
     const url = new URL(request.url ?? "/", `http://localhost:${this.port}`);
     const sessionId = url.searchParams.get("session") ?? "default";
-    const wsDom = await this.getSession(sessionId);
-    wsDom.addConnection(createWebSocketServerTransport(ws));
+    try {
+      const wsDom = await this.getSession(sessionId);
+      wsDom.addConnection(createWebSocketServerTransport(ws));
+    } catch (error) {
+      console.error(`Failed to initialize session ${sessionId}:`, error);
+      ws.close();
+      return;
+    }
 
     ws.on("message", (data) => {
       const message = JSON.parse(data.toString());
       if (message.type === "e2e-import") {
-        wsDom.domImport(message.path);
+        void this.getSession(sessionId)
+          .then((session) => {
+            session.domImport(message.path);
+          })
+          .catch((error) => {
+            console.error(
+              `Failed to import test script for session ${sessionId}:`,
+              error
+            );
+          });
       }
     });
   }
@@ -80,6 +117,12 @@ export class TestServer {
           htmlDocument: this.baseDoc,
           url,
           adapter,
+          sessionId,
+        });
+        session.enableAssetProxy({
+          baseUrl: url,
+          secret: ASSET_PROXY_SECRET,
+          allowUrl: (target) => target.origin === url,
         });
         this.sessions.set(sessionId, session);
         this.sessionPromises.delete(sessionId);

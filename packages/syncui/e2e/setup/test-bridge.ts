@@ -4,7 +4,6 @@ export type SyncuiTestBridge = {
   client: SyncUIClient | null;
   eventLog: string[];
   wsSendLog: string[];
-  wsInstances: WebSocket[];
 };
 
 export function initSyncuiTestBridge(client: SyncUIClient) {
@@ -13,7 +12,6 @@ export function initSyncuiTestBridge(client: SyncUIClient) {
       client,
       eventLog: [],
       wsSendLog: [],
-      wsInstances: [],
     };
     return;
   }

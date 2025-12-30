@@ -1,58 +1,74 @@
 export type WindowLike = { document: Document };
 
+const TEXT_NODE = 3;
+const ELEMENT_NODE = 1;
+
 export function getXPath(
   node: Element | Text,
   window: WindowLike
 ): XPath | null {
-  // Node object not accessible on backend
-  const TEXT_NODE = 3;
-  const ELEMENT_NODE = 1;
-
   if (node.nodeType === TEXT_NODE) {
-    const parent = node.parentNode as Element;
-    if (!parent) return null;
-    const siblings = parent.childNodes;
-    let index = 1;
-    for (let i = 0; i < siblings.length; i++) {
-      if (siblings[i] === node) break;
-      if (siblings[i].nodeType === TEXT_NODE) index++;
-    }
-    const parentXPath = getXPath(parent, window);
-    if (parentXPath) {
-      return `${parentXPath}/text()[${index}]`;
-    }
+    return getTextXPath(node as Text, window);
+  }
+  return getElementXPath(node as Element, window);
+}
+
+const getTextXPath = (node: Text, window: WindowLike): XPath | null => {
+  const parent = node.parentNode as Element | null;
+  if (!parent) {
     return null;
   }
+  const index = getNodeIndex(parent.childNodes, node, TEXT_NODE);
+  const parentXPath = getXPath(parent, window);
+  return parentXPath ? `${parentXPath}/text()[${index}]` : null;
+};
 
-  const element = node as Element;
+const getElementXPath = (
+  element: Element,
+  window: WindowLike
+): XPath | null => {
   if (element.id !== "") {
     return `//*[@id="${element.id}"]`;
   }
   if (element === window.document.body) {
     return "/html/body";
   }
-  let ix = 0;
-  const siblings = element.parentNode?.childNodes;
-  if (siblings) {
-    for (let i = 0; i < siblings.length; i++) {
-      const sibling = siblings[i];
-      if (sibling === element) {
-        const parentXPath = getXPath(element.parentNode as Element, window);
-        if (parentXPath) {
-          return `${parentXPath}/${element.tagName.toLowerCase()}[${ix + 1}]`;
-        }
-        return null;
-      }
-      if (
-        sibling.nodeType === ELEMENT_NODE &&
-        sibling.nodeName === element.nodeName
-      ) {
-        ix++;
-      }
+  const parent = element.parentNode as Element | null;
+  if (!parent) {
+    return null;
+  }
+  const index = getNodeIndex(
+    parent.childNodes,
+    element,
+    ELEMENT_NODE,
+    element.nodeName
+  );
+  const parentXPath = getXPath(parent, window);
+  return parentXPath
+    ? `${parentXPath}/${element.tagName.toLowerCase()}[${index}]`
+    : null;
+};
+
+const getNodeIndex = (
+  siblings: NodeListOf<ChildNode>,
+  node: Node,
+  nodeType: number,
+  nodeName?: string
+): number => {
+  let index = 1;
+  for (const sibling of Array.from(siblings)) {
+    if (sibling === node) {
+      break;
+    }
+    if (
+      sibling.nodeType === nodeType &&
+      (!nodeName || (sibling as Element).nodeName === nodeName)
+    ) {
+      index += 1;
     }
   }
-  return null;
-}
+  return index;
+};
 
 export function debounce<Args extends unknown[], R>(
   func: (...args: Args) => R,
@@ -61,10 +77,14 @@ export function debounce<Args extends unknown[], R>(
   let timeout: ReturnType<typeof setTimeout> | null;
   return function executedFunction(...args: Args): void {
     const later = () => {
-      if (timeout) clearTimeout(timeout);
+      if (timeout) {
+        clearTimeout(timeout);
+      }
       func(...args);
     };
-    if (timeout) clearTimeout(timeout);
+    if (timeout) {
+      clearTimeout(timeout);
+    }
     timeout = setTimeout(later, wait);
   };
 }

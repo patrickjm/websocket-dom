@@ -19,26 +19,95 @@ import { withSuppressedTarget } from "./suppress";
 
 type DispatchTarget = HTMLElement | Document | AdapterWindow;
 type ConstructorWindow = Window & typeof globalThis;
+type EventDeserializer = (
+  event: SerializedEvent,
+  window: AdapterWindow
+) => Event;
 
 const getConstructorWindow = (window: AdapterWindow): ConstructorWindow =>
   window as ConstructorWindow;
 
+const mouseButtonTypes = new Set([
+  "mousedown",
+  "mouseup",
+  "dblclick",
+  "contextmenu",
+]);
+
+const keyTypes = new Set(["keydown", "keyup", "keypress"]);
+
+const focusTypes = new Set(["focus", "blur", "focusin", "focusout"]);
+
+const pointerTypes = new Set([
+  "pointerdown",
+  "pointerup",
+  "pointermove",
+  "pointerenter",
+  "pointerleave",
+  "pointerover",
+  "pointerout",
+  "pointercancel",
+]);
+
+const touchTypes = new Set([
+  "touchstart",
+  "touchmove",
+  "touchend",
+  "touchcancel",
+]);
+
+const clipboardTypes = new Set(["copy", "cut", "paste"]);
+
+const compositionTypes = new Set([
+  "compositionstart",
+  "compositionupdate",
+  "compositionend",
+]);
+
+const mouseMoveTypes = new Set([
+  "mouseenter",
+  "mouseleave",
+  "mousemove",
+  "mouseout",
+  "mouseover",
+]);
+
+const dragTypes = new Set([
+  "dragstart",
+  "drag",
+  "dragend",
+  "dragenter",
+  "dragover",
+  "dragleave",
+  "drop",
+]);
+
+const fallbackOnlyTypes = new Set(["selectionchange", "scroll", "resize"]);
+
+const byTypeDeserializers = new Map<string, EventDeserializer>([
+  ["click", deserializeClickEvent as EventDeserializer],
+  ["change", deserializeChangeEvent as EventDeserializer],
+  ["input", deserializeInputEvent as EventDeserializer],
+  ["submit", deserializeSubmitEvent as EventDeserializer],
+  ["wheel", deserializeWheelEvent as EventDeserializer],
+  ["beforeinput", deserializeBeforeInputEvent as EventDeserializer],
+]);
+
 export function dispatchEvent(
-  nodes: NodeStash,
-  emitter: DomEmitter,
+  _nodes: NodeStash,
+  _emitter: DomEmitter,
   window: AdapterWindow,
   event: SerializedEvent
 ) {
   const [targetElement, dispatchedEvent] = deserializeEvent(window, event);
-  if (!targetElement || !dispatchedEvent) {
+  if (!(targetElement && dispatchedEvent)) {
     return;
   }
+  preventAnchorNavigation(window, targetElement, event.type, dispatchedEvent);
   if (event.type === "input" || event.type === "change") {
     applyInputValue(window, targetElement, event.value);
   }
-  if (dispatchedEvent) {
-    targetElement.dispatchEvent(dispatchedEvent);
-  }
+  targetElement.dispatchEvent(dispatchedEvent);
   if (event.type === "keydown") {
     simulateKeyboardInput(window, targetElement, event);
   }
@@ -52,132 +121,85 @@ function deserializeEvent(
     ? getElementFromXPath(event.target, window.document)
     : null;
   const fallbackTarget = getFallbackTarget(window, event.type);
-
-  switch (event.type) {
-    case "click":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeClickEvent(event, window),
-      ];
-    case "mousedown":
-    case "mouseup":
-    case "dblclick":
-    case "contextmenu":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeMouseButtonEvent(event, window),
-      ];
-    case "keydown":
-    case "keyup":
-    case "keypress":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeKeyboardEvent(event, window),
-      ];
-    case "focus":
-    case "blur":
-    case "focusin":
-    case "focusout":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeFocusEvent(event, window),
-      ];
-    case "change": {
-      const changeEvent = deserializeChangeEvent(event, window);
-      return [targetElement ?? fallbackTarget, changeEvent];
-    }
-    case "input": {
-      const inputEvent = deserializeInputEvent(event, window);
-      return [targetElement ?? fallbackTarget, inputEvent];
-    }
-    case "submit":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeSubmitEvent(event, window),
-      ];
-    case "wheel":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeWheelEvent(event, window),
-      ];
-    case "pointerdown":
-    case "pointerup":
-    case "pointermove":
-    case "pointerenter":
-    case "pointerleave":
-    case "pointerover":
-    case "pointerout":
-    case "pointercancel":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializePointerEvent(event, window),
-      ];
-    case "touchstart":
-    case "touchmove":
-    case "touchend":
-    case "touchcancel":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeTouchEvent(event, window),
-      ];
-    case "copy":
-    case "cut":
-    case "paste":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeClipboardEvent(event, window),
-      ];
-    case "compositionstart":
-    case "compositionupdate":
-    case "compositionend":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeCompositionEvent(event, window),
-      ];
-    case "beforeinput":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeBeforeInputEvent(event, window),
-      ];
-    case "selectionchange":
-      return [fallbackTarget, deserializeDefaultEvent(event, window)];
-    case "scroll":
-    case "resize":
-      return [fallbackTarget, deserializeDefaultEvent(event, window)];
-    case "reset":
-    case "invalid":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeDefaultEvent(event, window),
-      ];
-    case "mouseenter":
-    case "mouseleave":
-    case "mousemove":
-    case "mouseout":
-    case "mouseover":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeMouseEvent(event, window),
-      ];
-    case "dragstart":
-    case "drag":
-    case "dragend":
-    case "dragenter":
-    case "dragover":
-    case "dragleave":
-    case "drop":
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeDragEvent(event, window),
-      ];
-    default:
-      console.warn(`Unhandled event type: ${(event as SerializedEvent).type}`);
-      return [
-        targetElement ?? fallbackTarget,
-        deserializeDefaultEvent(event, window),
-      ];
-  }
+  const dispatchTarget = fallbackOnlyTypes.has(event.type)
+    ? fallbackTarget
+    : targetElement ?? fallbackTarget;
+  const deserializer = getEventDeserializer(event.type);
+  return [dispatchTarget, deserializer(event, window)];
 }
+
+const preventAnchorNavigation = (
+  window: AdapterWindow,
+  targetElement: DispatchTarget,
+  type: string,
+  dispatchedEvent: Event
+) => {
+  if (type !== "click") {
+    return;
+  }
+  const ctorWindow = getConstructorWindow(window);
+  if (!(targetElement instanceof ctorWindow.HTMLElement)) {
+    return;
+  }
+  const anchor = targetElement.closest("a");
+  if (anchor) {
+    dispatchedEvent.preventDefault();
+  }
+};
+
+const getEventDeserializer = (
+  type: string
+): ((event: SerializedEvent, window: AdapterWindow) => Event) => {
+  const direct = byTypeDeserializers.get(type);
+  if (direct) {
+    return direct;
+  }
+  const grouped = getGroupedDeserializer(type);
+  if (grouped) {
+    return grouped;
+  }
+  return deserializeDefaultEvent;
+};
+
+const getGroupedDeserializer = (
+  type: string
+): ((event: SerializedEvent, window: AdapterWindow) => Event) | null => {
+  const groups: Array<{
+    types: Set<string>;
+    handler: (event: SerializedEvent, window: AdapterWindow) => Event;
+  }> = [
+    {
+      types: mouseButtonTypes,
+      handler: deserializeMouseButtonEvent as EventDeserializer,
+    },
+    { types: keyTypes, handler: deserializeKeyboardEvent as EventDeserializer },
+    { types: focusTypes, handler: deserializeFocusEvent as EventDeserializer },
+    {
+      types: pointerTypes,
+      handler: deserializePointerEvent as EventDeserializer,
+    },
+    { types: touchTypes, handler: deserializeTouchEvent as EventDeserializer },
+    {
+      types: clipboardTypes,
+      handler: deserializeClipboardEvent as EventDeserializer,
+    },
+    {
+      types: compositionTypes,
+      handler: deserializeCompositionEvent as EventDeserializer,
+    },
+    {
+      types: mouseMoveTypes,
+      handler: deserializeMouseEvent as EventDeserializer,
+    },
+    { types: dragTypes, handler: deserializeDragEvent as EventDeserializer },
+  ];
+  for (const group of groups) {
+    if (group.types.has(type)) {
+      return group.handler;
+    }
+  }
+  return null;
+};
 
 function deserializeClickEvent(
   event: SerializedClickEvent,
@@ -192,10 +214,10 @@ function deserializeClickEvent(
     clientY: event.clientY,
     button: event.button || 0,
     buttons: event.buttons || 1,
-    altKey: event.altKey || false,
-    ctrlKey: event.ctrlKey || false,
-    metaKey: event.metaKey || false,
-    shiftKey: event.shiftKey || false,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    shiftKey: event.shiftKey,
   });
 }
 
@@ -212,10 +234,10 @@ function deserializeMouseButtonEvent(
     clientY: event.clientY,
     button: event.button || 0,
     buttons: event.buttons || 1,
-    altKey: event.altKey || false,
-    ctrlKey: event.ctrlKey || false,
-    metaKey: event.metaKey || false,
-    shiftKey: event.shiftKey || false,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    shiftKey: event.shiftKey,
   });
 }
 
@@ -230,15 +252,15 @@ function deserializeKeyboardEvent(
     key: event.key,
     code: event.code,
     location: event.location || 0,
-    repeat: event.repeat || false,
-    isComposing: event.isComposing || false,
+    repeat: event.repeat ?? false,
+    isComposing: event.isComposing ?? false,
     charCode: event.charCode,
     keyCode: event.keyCode,
     which: event.which,
-    altKey: event.altKey || false,
-    ctrlKey: event.ctrlKey || false,
-    metaKey: event.metaKey || false,
-    shiftKey: event.shiftKey || false,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    shiftKey: event.shiftKey,
   });
 }
 
@@ -256,7 +278,7 @@ function deserializeFocusEvent(
 }
 
 function deserializeChangeEvent(
-  event: SerializedChangeEvent,
+  _event: SerializedChangeEvent,
   window: AdapterWindow
 ): Event {
   const ctorWindow = getConstructorWindow(window);
@@ -277,13 +299,13 @@ function deserializeInputEvent(
     cancelable: true,
     inputType: event.inputType,
     data: event.data,
-    isComposing: event.isComposing || false,
+    isComposing: event.isComposing ?? false,
   });
   return inputEvent;
 }
 
 function deserializeSubmitEvent(
-  event: SerializedSubmitEvent,
+  _event: SerializedSubmitEvent,
   window: AdapterWindow
 ): SubmitEvent {
   const ctorWindow = getConstructorWindow(window);
@@ -479,21 +501,8 @@ function applyInputValue(
   options: { suppress?: boolean } = {}
 ) {
   const { suppress = true } = options;
-  const ctorWindow = getConstructorWindow(window);
   const apply = () => {
-    if (isTextInputElement(window, element)) {
-      element.value = value;
-    } else if (element instanceof ctorWindow.HTMLElement) {
-      const htmlElement = element as HTMLElement;
-      if (
-        htmlElement.isContentEditable ||
-        htmlElement.getAttribute("contenteditable") !== null
-      ) {
-        htmlElement.textContent = value;
-      }
-    } else if (element && "value" in element) {
-      (element as HTMLInputElement).value = value;
-    }
+    applyInputValueToElement(window, element, value);
   };
   if (suppress) {
     withSuppressedTarget(element, apply);
@@ -507,97 +516,31 @@ function simulateKeyboardInput(
   element: EventTarget,
   event: SerializedEvent
 ) {
+  const key = getSimulatedKey(event);
+  if (!key) {
+    return;
+  }
   if (!isTextInputElement(window, element)) {
-    return;
-  }
-  if (event.type !== "keydown") {
-    return;
-  }
-  if (!isSimulatedEvent(event)) {
-    return;
-  }
-  if (!("key" in event)) {
-    return;
-  }
-  const key = event.key;
-  if (typeof key !== "string") {
     return;
   }
   const value = element.value;
   const selectionStart = element.selectionStart ?? value.length;
   const selectionEnd = element.selectionEnd ?? value.length;
-  let nextValue = value;
-  let nextCaret = selectionStart;
-  let inputType: string | null = null;
-
-  if (key === "Backspace") {
-    if (selectionStart !== selectionEnd) {
-      nextValue = value.slice(0, selectionStart) + value.slice(selectionEnd);
-      nextCaret = selectionStart;
-    } else if (selectionStart > 0) {
-      nextValue =
-        value.slice(0, selectionStart - 1) + value.slice(selectionEnd);
-      nextCaret = selectionStart - 1;
-    } else {
-      return;
-    }
-    inputType = "deleteContentBackward";
-  } else if (key === "Delete") {
-    if (selectionStart !== selectionEnd) {
-      nextValue = value.slice(0, selectionStart) + value.slice(selectionEnd);
-      nextCaret = selectionStart;
-    } else if (selectionStart < value.length) {
-      nextValue =
-        value.slice(0, selectionStart) + value.slice(selectionStart + 1);
-      nextCaret = selectionStart;
-    } else {
-      return;
-    }
-    inputType = "deleteContentForward";
-  } else if (key === "Enter") {
-    const ctorWindow = getConstructorWindow(window);
-    if (element instanceof ctorWindow.HTMLTextAreaElement) {
-      nextValue = `${value.slice(0, selectionStart)}\n${value.slice(
-        selectionEnd
-      )}`;
-      nextCaret = selectionStart + 1;
-      inputType = "insertLineBreak";
-    }
-  } else if (key.length === 1) {
-    nextValue =
-      value.slice(0, selectionStart) + key + value.slice(selectionEnd);
-    nextCaret = selectionStart + 1;
-    inputType = "insertText";
-  } else {
+  const update = resolveKeyboardUpdate(
+    window,
+    element,
+    key,
+    value,
+    selectionStart,
+    selectionEnd
+  );
+  if (!update) {
     return;
   }
-
-  if (nextValue !== value) {
-    applyInputValue(window, element, nextValue, { suppress: false });
-    if (typeof element.setSelectionRange === "function") {
-      element.setSelectionRange(nextCaret, nextCaret);
-    }
-  }
-
-  if (inputType) {
-    const ctorWindow = getConstructorWindow(window);
-    const inputEvent = new ctorWindow.InputEvent("input", {
-      bubbles: true,
-      cancelable: true,
-      inputType,
-      data: key.length === 1 ? key : null,
-      isComposing: false,
-    });
-    element.dispatchEvent(inputEvent);
-  }
-
-  if (key === "Enter") {
-    const ctorWindow = getConstructorWindow(window);
-    const changeEvent = new ctorWindow.Event("change", {
-      bubbles: true,
-      cancelable: true,
-    });
-    element.dispatchEvent(changeEvent);
+  applyKeyboardUpdate(window, element, update, value);
+  dispatchKeyboardInputEvent(window, element, update);
+  if (update.shouldDispatchChange) {
+    dispatchChangeEvent(window, element);
   }
 }
 
@@ -606,6 +549,227 @@ function isSimulatedEvent(event: SerializedEvent): boolean {
     return false;
   }
   return Boolean((event as { simulate?: boolean }).simulate);
+}
+
+function applyInputValueToElement(
+  window: AdapterWindow,
+  element: EventTarget,
+  value: string
+): boolean {
+  if (isTextInputElement(window, element)) {
+    element.value = value;
+    return true;
+  }
+  if (isContentEditableElement(window, element)) {
+    element.textContent = value;
+    return true;
+  }
+  if (element && "value" in element) {
+    (element as HTMLInputElement).value = value;
+    return true;
+  }
+  return false;
+}
+
+function isContentEditableElement(
+  window: AdapterWindow,
+  element: EventTarget
+): element is HTMLElement {
+  const ctorWindow = getConstructorWindow(window);
+  if (!(element instanceof ctorWindow.HTMLElement)) {
+    return false;
+  }
+  return (
+    element.isContentEditable ||
+    element.getAttribute("contenteditable") !== null
+  );
+}
+
+function getSimulatedKey(event: SerializedEvent): string | null {
+  if (event.type !== "keydown") {
+    return null;
+  }
+  if (!isSimulatedEvent(event)) {
+    return null;
+  }
+  if (!("key" in event)) {
+    return null;
+  }
+  const key = event.key;
+  if (typeof key !== "string") {
+    return null;
+  }
+  return key;
+}
+
+type KeyboardUpdate = {
+  nextValue: string;
+  nextCaret: number;
+  inputType: string;
+  data: string | null;
+  shouldDispatchChange: boolean;
+};
+
+function resolveKeyboardUpdate(
+  window: AdapterWindow,
+  element: HTMLInputElement | HTMLTextAreaElement,
+  key: string,
+  value: string,
+  selectionStart: number,
+  selectionEnd: number
+): KeyboardUpdate | null {
+  if (key === "Backspace") {
+    return resolveBackspaceUpdate(value, selectionStart, selectionEnd);
+  }
+  if (key === "Delete") {
+    return resolveDeleteUpdate(value, selectionStart, selectionEnd);
+  }
+  if (key === "Enter") {
+    return resolveEnterUpdate(
+      window,
+      element,
+      value,
+      selectionStart,
+      selectionEnd
+    );
+  }
+  if (key.length === 1) {
+    return resolveInsertUpdate(value, selectionStart, selectionEnd, key);
+  }
+  return null;
+}
+
+function resolveBackspaceUpdate(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number
+): KeyboardUpdate | null {
+  if (selectionStart !== selectionEnd) {
+    return {
+      nextValue: value.slice(0, selectionStart) + value.slice(selectionEnd),
+      nextCaret: selectionStart,
+      inputType: "deleteContentBackward",
+      data: null,
+      shouldDispatchChange: false,
+    };
+  }
+  if (selectionStart > 0) {
+    return {
+      nextValue: value.slice(0, selectionStart - 1) + value.slice(selectionEnd),
+      nextCaret: selectionStart - 1,
+      inputType: "deleteContentBackward",
+      data: null,
+      shouldDispatchChange: false,
+    };
+  }
+  return null;
+}
+
+function resolveDeleteUpdate(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number
+): KeyboardUpdate | null {
+  if (selectionStart !== selectionEnd) {
+    return {
+      nextValue: value.slice(0, selectionStart) + value.slice(selectionEnd),
+      nextCaret: selectionStart,
+      inputType: "deleteContentForward",
+      data: null,
+      shouldDispatchChange: false,
+    };
+  }
+  if (selectionStart < value.length) {
+    return {
+      nextValue:
+        value.slice(0, selectionStart) + value.slice(selectionStart + 1),
+      nextCaret: selectionStart,
+      inputType: "deleteContentForward",
+      data: null,
+      shouldDispatchChange: false,
+    };
+  }
+  return null;
+}
+
+function resolveEnterUpdate(
+  window: AdapterWindow,
+  element: HTMLInputElement | HTMLTextAreaElement,
+  value: string,
+  selectionStart: number,
+  selectionEnd: number
+): KeyboardUpdate | null {
+  const ctorWindow = getConstructorWindow(window);
+  if (!(element instanceof ctorWindow.HTMLTextAreaElement)) {
+    return null;
+  }
+  return {
+    nextValue: `${value.slice(0, selectionStart)}\n${value.slice(
+      selectionEnd
+    )}`,
+    nextCaret: selectionStart + 1,
+    inputType: "insertLineBreak",
+    data: null,
+    shouldDispatchChange: true,
+  };
+}
+
+function resolveInsertUpdate(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  key: string
+): KeyboardUpdate {
+  return {
+    nextValue: value.slice(0, selectionStart) + key + value.slice(selectionEnd),
+    nextCaret: selectionStart + 1,
+    inputType: "insertText",
+    data: key,
+    shouldDispatchChange: false,
+  };
+}
+
+function applyKeyboardUpdate(
+  window: AdapterWindow,
+  element: HTMLInputElement | HTMLTextAreaElement,
+  update: KeyboardUpdate,
+  value: string
+) {
+  if (update.nextValue === value) {
+    return;
+  }
+  applyInputValue(window, element, update.nextValue, { suppress: false });
+  if (typeof element.setSelectionRange === "function") {
+    element.setSelectionRange(update.nextCaret, update.nextCaret);
+  }
+}
+
+function dispatchKeyboardInputEvent(
+  window: AdapterWindow,
+  element: HTMLInputElement | HTMLTextAreaElement,
+  update: KeyboardUpdate
+) {
+  const ctorWindow = getConstructorWindow(window);
+  const inputEvent = new ctorWindow.InputEvent("input", {
+    bubbles: true,
+    cancelable: true,
+    inputType: update.inputType,
+    data: update.data,
+    isComposing: false,
+  });
+  element.dispatchEvent(inputEvent);
+}
+
+function dispatchChangeEvent(
+  window: AdapterWindow,
+  element: HTMLInputElement | HTMLTextAreaElement
+) {
+  const ctorWindow = getConstructorWindow(window);
+  const changeEvent = new ctorWindow.Event("change", {
+    bubbles: true,
+    cancelable: true,
+  });
+  element.dispatchEvent(changeEvent);
 }
 
 function getFallbackTarget(

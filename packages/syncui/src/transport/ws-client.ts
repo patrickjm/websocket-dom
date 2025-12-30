@@ -13,6 +13,7 @@ export function wrapBrowserWebSocket(ws: WebSocket): TransportConnection {
   const closeHandlers = new Set<() => void>();
   const openHandlers = new Set<() => void>();
   const errorHandlers = new Set<(error: unknown) => void>();
+  let closed = false;
 
   ws.addEventListener("message", (event) => {
     const data =
@@ -21,11 +22,16 @@ export function wrapBrowserWebSocket(ws: WebSocket): TransportConnection {
       handler(data);
     }
   });
-  ws.addEventListener("close", () => {
+  const notifyClose = () => {
+    if (closed) {
+      return;
+    }
+    closed = true;
     for (const handler of closeHandlers) {
       handler();
     }
-  });
+  };
+  ws.addEventListener("close", notifyClose);
   ws.addEventListener("open", () => {
     for (const handler of openHandlers) {
       handler();
@@ -39,7 +45,10 @@ export function wrapBrowserWebSocket(ws: WebSocket): TransportConnection {
 
   return {
     send: (data: string) => ws.send(data),
-    close: () => ws.close(),
+    close: () => {
+      ws.close();
+      notifyClose();
+    },
     isOpen: () => ws.readyState === WebSocket.OPEN,
     onMessage: (handler) => {
       messageHandlers.add(handler);

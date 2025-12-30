@@ -35,7 +35,6 @@ export async function installPlaywrightBridge(
   await page.evaluate(
     ({ bindingName }) => {
       const bindingTarget = window as unknown as Record<string, unknown>;
-
       const shouldSkipAttribute = (name: string, value: string) => {
         const lower = name.toLowerCase();
         if (lower.startsWith("on")) {
@@ -51,7 +50,6 @@ export async function installPlaywrightBridge(
         }
         return false;
       };
-
       const getXPath = (node: Node): string | null => {
         const TEXT_NODE = 3;
         const ELEMENT_NODE = 1;
@@ -119,7 +117,6 @@ export async function installPlaywrightBridge(
         }
         return null;
       };
-
       const sanitizeElement = (element: Element): Element => {
         const clone = element.cloneNode(true) as Element;
         for (const script of Array.from(clone.querySelectorAll("script"))) {
@@ -135,7 +132,6 @@ export async function installPlaywrightBridge(
         }
         return clone;
       };
-
       const hasUnsafeHtml = (html: string): boolean => {
         const lowered = html.toLowerCase();
         if (lowered.includes("<script")) {
@@ -149,7 +145,6 @@ export async function installPlaywrightBridge(
         }
         return false;
       };
-
       const isScriptNode = (node: Node): boolean => {
         if (node instanceof HTMLScriptElement) {
           return node.getAttribute("data-syncui-allow") !== "true";
@@ -162,7 +157,6 @@ export async function installPlaywrightBridge(
         }
         return false;
       };
-
       const stripScriptNodes = (node: Node): Node => {
         if (node instanceof DocumentFragment) {
           for (const script of Array.from(node.querySelectorAll("script"))) {
@@ -248,7 +242,6 @@ export async function installPlaywrightBridge(
       const emitRemoveAttribute = (xpath: string, name: string) => {
         emit(["removeAttribute", { type: "xpath", xpath }, name]);
       };
-
       const hasUnsafeNode = (node: Node): boolean => {
         if (node instanceof Element) {
           if (node.tagName.toLowerCase() === "script") {
@@ -261,7 +254,6 @@ export async function installPlaywrightBridge(
         }
         return false;
       };
-
       const handleMutations = (records: MutationRecord[]) => {
         for (const record of records) {
           if (record.type === "attributes") {

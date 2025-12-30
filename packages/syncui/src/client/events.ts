@@ -4,42 +4,90 @@ import type {
 } from "../core/protocol/events";
 import { getXPath } from "../shared-utils";
 
+const allowDefaultTypes = new Set([
+  "input",
+  "change",
+  "focus",
+  "blur",
+  "focusin",
+  "focusout",
+  "beforeinput",
+  "compositionstart",
+  "compositionupdate",
+  "compositionend",
+  "dragstart",
+  "drag",
+  "dragend",
+  "dragenter",
+  "dragover",
+  "dragleave",
+  "drop",
+]);
+
+const passthroughTypes = new Set([
+  "focus",
+  "blur",
+  "focusin",
+  "focusout",
+  "submit",
+  "pointerdown",
+  "pointerup",
+  "pointermove",
+  "pointerenter",
+  "pointerleave",
+  "pointerover",
+  "pointerout",
+  "pointercancel",
+  "touchstart",
+  "touchmove",
+  "touchend",
+  "touchcancel",
+  "copy",
+  "cut",
+  "paste",
+  "compositionstart",
+  "compositionupdate",
+  "compositionend",
+  "beforeinput",
+  "selectionchange",
+  "scroll",
+  "resize",
+  "reset",
+  "invalid",
+]);
+
+const mouseButtonTypes = new Set([
+  "mousedown",
+  "mouseup",
+  "dblclick",
+  "contextmenu",
+]);
+
+const mouseMoveTypes = new Set([
+  "mouseenter",
+  "mouseleave",
+  "mousemove",
+  "mouseout",
+  "mouseover",
+]);
+
+const dragTypes = new Set([
+  "dragstart",
+  "drag",
+  "dragend",
+  "dragenter",
+  "dragover",
+  "dragleave",
+  "drop",
+]);
+
 export function serializeEvent(event: Event): SerializedEvent {
-  const allowDefaultTypes = new Set([
-    "input",
-    "change",
-    "focus",
-    "blur",
-    "focusin",
-    "focusout",
-    "beforeinput",
-    "compositionstart",
-    "compositionupdate",
-    "compositionend",
-    "dragstart",
-    "drag",
-    "dragend",
-    "dragenter",
-    "dragover",
-    "dragleave",
-    "drop",
-  ]);
-  if (!event.type.startsWith("key") && !allowDefaultTypes.has(event.type)) {
+  if (!(event.type.startsWith("key") || allowDefaultTypes.has(event.type))) {
     event.stopPropagation();
     event.preventDefault();
   }
 
-  let targetNode = event.target;
-  if (targetNode instanceof Text && targetNode.parentElement) {
-    targetNode = targetNode.parentElement;
-  } else if (
-    !(targetNode instanceof Element) &&
-    !(targetNode instanceof Text)
-  ) {
-    if (document.activeElement instanceof HTMLElement) {
-      targetNode = document.activeElement;
-    }
-  }
+  const targetNode = resolveTargetNode(event.target);
   const baseEvent: BaseSerializedEvent = {
     type: event.type,
     target:
@@ -49,77 +97,84 @@ export function serializeEvent(event: Event): SerializedEvent {
     timestamp: Date.now(),
   };
 
-  switch (event.type) {
-    case "click":
-      return serializeClickEvent(event as MouseEvent, baseEvent);
-    case "mousedown":
-    case "mouseup":
-    case "dblclick":
-    case "contextmenu":
-      return serializeMouseButtonEvent(event as MouseEvent, baseEvent);
-    case "keydown":
-    case "keyup":
-    case "keypress":
-      return serializeKeyboardEvent(event as KeyboardEvent, baseEvent);
-    case "focus":
-    case "blur":
-    case "focusin":
-    case "focusout":
-      return baseEvent as SerializedEvent;
-    case "input":
-      return serializeInputEvent(event as InputEvent, baseEvent);
-    case "submit":
-      return baseEvent as SerializedEvent;
-    case "wheel":
-      return serializeWheelEvent(event as WheelEvent, baseEvent);
-    case "pointerdown":
-    case "pointerup":
-    case "pointermove":
-    case "pointerenter":
-    case "pointerleave":
-    case "pointerover":
-    case "pointerout":
-    case "pointercancel":
-    case "touchstart":
-    case "touchmove":
-    case "touchend":
-    case "touchcancel":
-    case "copy":
-    case "cut":
-    case "paste":
-    case "compositionstart":
-    case "compositionupdate":
-    case "compositionend":
-    case "beforeinput":
-    case "selectionchange":
-    case "scroll":
-    case "resize":
-    case "reset":
-    case "invalid":
-      return baseEvent as SerializedEvent;
-    case "mouseenter":
-    case "mouseleave":
-    case "mousemove":
-    case "mouseout":
-    case "mouseover":
-      return serializeMouseEvent(event as MouseEvent, baseEvent);
-    case "dragstart":
-    case "drag":
-    case "dragend":
-    case "dragenter":
-    case "dragover":
-    case "dragleave":
-    case "drop":
-      return serializeDragEvent(event as MouseEvent, baseEvent);
-    case "change":
-      return serializeChangeEvent(event, baseEvent);
-    default:
-      console.warn(`Unhandled event type: ${event.type}`);
-      return baseEvent as SerializedEvent;
+  const handler = getEventHandler(event.type);
+  if (handler) {
+    return handler(event, baseEvent);
   }
+  if (passthroughTypes.has(event.type)) {
+    return baseEvent as SerializedEvent;
+  }
+  console.warn(`Unhandled event type: ${event.type}`);
+  return baseEvent as SerializedEvent;
 }
 
+const resolveTargetNode = (
+  target: EventTarget | null
+): Element | Text | null => {
+  if (target instanceof Text) {
+    return target.parentElement ?? target;
+  }
+  if (target instanceof Element) {
+    return target;
+  }
+  if (document.activeElement instanceof HTMLElement) {
+    return document.activeElement;
+  }
+  return null;
+};
+
+const getEventHandler = (
+  type: string
+):
+  | ((event: Event, baseEvent: BaseSerializedEvent) => SerializedEvent)
+  | null => {
+  if (type === "click") {
+    return (event, baseEvent) =>
+      serializeClickEvent(event as MouseEvent, baseEvent);
+  }
+  if (mouseButtonTypes.has(type)) {
+    return (event, baseEvent) =>
+      serializeMouseButtonEvent(event as MouseEvent, baseEvent);
+  }
+  if (type.startsWith("key")) {
+    return (event, baseEvent) =>
+      serializeKeyboardEvent(event as KeyboardEvent, baseEvent);
+  }
+  if (type === "input") {
+    return (event, baseEvent) =>
+      serializeInputEvent(event as InputEvent, baseEvent);
+  }
+  if (type === "wheel") {
+    return (event, baseEvent) =>
+      serializeWheelEvent(event as WheelEvent, baseEvent);
+  }
+  if (mouseMoveTypes.has(type)) {
+    return (event, baseEvent) =>
+      serializeMouseEvent(event as MouseEvent, baseEvent);
+  }
+  if (dragTypes.has(type)) {
+    return (event, baseEvent) =>
+      serializeDragEvent(event as MouseEvent, baseEvent);
+  }
+  if (type === "change") {
+    return (event, baseEvent) => serializeChangeEvent(event, baseEvent);
+  }
+  return null;
+};
+
 function getInputValue(target: EventTarget | null): string {
+  const directValue = getTargetInputValue(target);
+  if (directValue !== null) {
+    return directValue;
+  }
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active.isContentEditable) {
+    return active.textContent ?? "";
+  }
+  return "";
+}
+
+const getTargetInputValue = (target: EventTarget | null): string | null => {
   if (
     target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement
@@ -129,20 +184,11 @@ function getInputValue(target: EventTarget | null): string {
   if (target instanceof Text && target.parentElement) {
     return target.parentElement.textContent ?? "";
   }
-  if (target instanceof HTMLElement && target.isContentEditable) {
-    return target.textContent ?? "";
-  }
   if (target instanceof HTMLElement) {
     return target.textContent ?? "";
   }
-  if (
-    document.activeElement instanceof HTMLElement &&
-    document.activeElement.isContentEditable
-  ) {
-    return document.activeElement.textContent ?? "";
-  }
-  return "";
-}
+  return null;
+};
 
 function serializeClickEvent(
   event: MouseEvent,
@@ -216,7 +262,7 @@ function serializeInputEvent(
     value,
     inputType: event.inputType,
     data: event.data,
-    isComposing: event.isComposing || false,
+    isComposing: event.isComposing ?? false,
   };
 }
 

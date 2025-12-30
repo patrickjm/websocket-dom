@@ -20,7 +20,6 @@ export function createSnapshotGetter(evalInPage: EvalInPage) {
         }
         return false;
       };
-
       const sanitizeElement = (element: Element): Element => {
         const clone = element.cloneNode(true) as Element;
         for (const script of Array.from(clone.querySelectorAll("script"))) {
@@ -36,7 +35,6 @@ export function createSnapshotGetter(evalInPage: EvalInPage) {
         }
         return clone;
       };
-
       const collectAttributes = (
         element: Element | null
       ): [string, string][] => {

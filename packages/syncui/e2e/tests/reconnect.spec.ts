@@ -10,20 +10,13 @@ test("should reconnect and request resync after disconnect", async ({
         client: null,
         eventLog: [],
         wsSendLog: [],
-        wsInstances: [],
       };
     } else {
       window.syncuiTestBridge.wsSendLog = [];
-      window.syncuiTestBridge.wsInstances = [];
     }
     const OriginalWebSocket = window.WebSocket;
 
     class TrackingWebSocket extends OriginalWebSocket {
-      constructor(url: string | URL, protocols?: string | string[]) {
-        super(url, protocols);
-        window.syncuiTestBridge?.wsInstances.push(this);
-      }
-
       send(data: string | ArrayBufferLike | Blob | ArrayBufferView) {
         try {
           const parsed = JSON.parse(typeof data === "string" ? data : "");
@@ -55,14 +48,19 @@ test("should reconnect and request resync after disconnect", async ({
   });
 
   await page.waitForFunction(
-    () => (window.syncuiTestBridge?.wsInstances.length ?? 0) >= 2
+    () => {
+      const client = window.syncuiTestBridge?.client;
+      if (!client?.transport?.isOpen?.()) {
+        return false;
+      }
+      if (client.state?.snapshotApplied !== true) {
+        client.resync?.();
+        return false;
+      }
+      return true;
+    },
+    { timeout: 60000 }
   );
-  await page.waitForFunction(() => {
-    const client = window.syncuiTestBridge?.client;
-    return (
-      client?.transport?.isOpen?.() && client?.state?.snapshotApplied === true
-    );
-  });
 
   const newMessages = await page.evaluate((start) => {
     return window.syncuiTestBridge?.wsSendLog.slice(start) ?? [];

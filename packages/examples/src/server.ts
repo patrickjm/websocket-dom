@@ -19,16 +19,32 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+const sessionId = "hn";
 const session = new SyncUIServerSession({
   htmlDocument: "<!doctype html><html><head></head><body></body></html>",
   url: `http://localhost:${port}`,
-  adapter: (document, options) => createJsdomAdapter(document, options, { JSDOM }),
+  adapter: (document, options) =>
+    createJsdomAdapter(document, options, { JSDOM }, { resources: "none" }),
+  sessionId,
+});
+
+session.enableAssetProxy({
+  baseUrl: "https://news.ycombinator.com/",
+  allowUrl: (target) => target.origin === "https://news.ycombinator.com",
 });
 
 session.import(workerPath);
 
 wss.on("connection", (ws) => {
   session.addConnection(createWebSocketServerTransport(ws));
+});
+
+app.get("/syncui/:session/assets/*", async (req, res) => {
+  if (req.params.session !== sessionId) {
+    res.status(404).end("not found");
+    return;
+  }
+  await session.assetProxyHandler()(req, res);
 });
 
 app.use(express.static(clientDir));

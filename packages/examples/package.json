@@ -6,7 +6,7 @@
   "packageManager": "yarn@1.22.22",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "dev": "yarn build && tsx src/server.ts",
+    "dev": "yarn workspace syncui build:server && yarn workspace syncui-dom build && yarn build && tsx src/server.ts",
     "start": "node dist/server.js"
   },
   "dependencies": {

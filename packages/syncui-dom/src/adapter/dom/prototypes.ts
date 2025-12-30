@@ -18,7 +18,7 @@ import {
   SetProperty,
   type DomEmitter,
 } from "syncui/core/ops/instructions";
-import type { NodeStash } from "syncui/core/model/nodes";
+import type { NodeRef, NodeStash } from "syncui/core/model/nodes";
 import {
   hasUnsafeHtml,
   isScriptElement,
@@ -36,7 +36,7 @@ export function extendPrototypes(
   const blockedPropertyNames = new Set(["innerHTML", "outerHTML"]);
 
   const isExecutableElement = (node: Node | null): boolean => {
-    if (!node || !(node instanceof ctorWindow.Element)) {
+    if (!(node && node instanceof ctorWindow.Element)) {
       return false;
     }
     return isScriptElement(node as Element);
@@ -65,26 +65,41 @@ export function extendPrototypes(
     prop: string,
     value: unknown
   ): boolean => {
-    if (prop.startsWith("on") || typeof value === "function") {
+    if (isHandlerProperty(prop, value)) {
       return false;
     }
     if (blockedPropertyNames.has(prop)) {
       return false;
     }
-    if (isTargetSuppressed(element)) {
-      const htmlElement = element as HTMLElement;
-      const isEditable =
-        htmlElement instanceof ctorWindow.HTMLElement &&
-        (htmlElement.isContentEditable ||
-          htmlElement.getAttribute("contenteditable") !== null);
-      if (
-        prop === "value" ||
-        ((prop === "textContent" || prop === "innerText") && isEditable)
-      ) {
-        return false;
-      }
+    return !isSuppressedProperty(element, prop);
+  };
+
+  const isHandlerProperty = (prop: string, value: unknown): boolean => {
+    return prop.startsWith("on") || typeof value === "function";
+  };
+
+  const isSuppressedProperty = (element: Element, prop: string): boolean => {
+    if (!isTargetSuppressed(element)) {
+      return false;
     }
-    return true;
+    if (prop === "value") {
+      return true;
+    }
+    if (prop !== "textContent" && prop !== "innerText") {
+      return false;
+    }
+    return isEditableElement(element);
+  };
+
+  const isEditableElement = (element: Element): boolean => {
+    const htmlElement = element as HTMLElement;
+    if (!(htmlElement instanceof ctorWindow.HTMLElement)) {
+      return false;
+    }
+    return (
+      htmlElement.isContentEditable ||
+      htmlElement.getAttribute("contenteditable") !== null
+    );
   };
 
   const emitProperty = (
@@ -139,20 +154,14 @@ export function extendPrototypes(
     if (isSuppressedNode(newChild)) {
       return ret as T;
     }
-    if (
-      parentRef &&
-      newChildRef &&
-      newChildRef.type === "stashed-id" &&
-      (referenceChild === null || referenceRef)
-    ) {
-      emitter.emit(
-        "instruction",
-        InsertBefore.serialize({
-          parent: parentRef,
-          child: newChildRef.id,
-          referenceChild: referenceRef ?? null,
-        })
-      );
+    const payload = getInsertBeforePayload(
+      parentRef,
+      newChildRef,
+      referenceChild,
+      referenceRef
+    );
+    if (payload) {
+      emitter.emit("instruction", InsertBefore.serialize(payload));
     }
     return ret as T;
   };
@@ -288,31 +297,137 @@ export function extendPrototypes(
   ): void {
     originalPrepend.apply(this, args);
     const parentRef = nodes.findRefFor(this as Node | Element);
-    if (parentRef) {
-      for (const node of args) {
-        if (node instanceof Node) {
-          if (isSuppressedNode(node)) {
-            continue;
-          }
-          const childRef = nodes.findRefFor(node as Node | Element);
-          if (childRef && childRef.type === "stashed-id") {
-            emitter.emit(
-              "instruction",
-              PrependChild.serialize({ parent: parentRef, child: childRef.id })
-            );
-          }
-        } else if (typeof node === "string") {
-          emitter.emit(
-            "instruction",
-            PrependChild.serialize({ parent: parentRef, child: node })
-          );
-        }
-      }
+    if (!parentRef) {
+      return;
+    }
+    for (const node of args) {
+      emitPrependChild(parentRef, node);
     }
   };
 
   const classAttributeSuppressed = new WeakSet<Element>();
   const styleAttributeSuppressed = new WeakSet<Element>();
+
+  type StashedNodeRef = Extract<NodeRef, { type: "stashed-id" }>;
+
+  const isStashedRef = (ref: NodeRef | null): ref is StashedNodeRef => {
+    if (!ref) {
+      return false;
+    }
+    return ref.type === "stashed-id";
+  };
+
+  const isReferenceValid = (
+    referenceChild: Node | null,
+    referenceRef: NodeRef | null
+  ): boolean => {
+    if (referenceChild === null) {
+      return true;
+    }
+    return referenceRef !== null;
+  };
+
+  const getInsertBeforePayload = (
+    parentRef: NodeRef | null,
+    newChildRef: NodeRef | null,
+    referenceChild: Node | null,
+    referenceRef: NodeRef | null
+  ): {
+    parent: NodeRef;
+    child: number;
+    referenceChild: NodeRef | null;
+  } | null => {
+    if (!parentRef) {
+      return null;
+    }
+    if (!isStashedRef(newChildRef)) {
+      return null;
+    }
+    if (!isReferenceValid(referenceChild, referenceRef)) {
+      return null;
+    }
+    return {
+      parent: parentRef,
+      child: newChildRef.id,
+      referenceChild: referenceRef ?? null,
+    };
+  };
+
+  const emitPrependChild = (parentRef: NodeRef, child: Node | string) => {
+    if (typeof child === "string") {
+      emitPrependText(parentRef, child);
+      return;
+    }
+    if (child instanceof Node) {
+      emitPrependNode(parentRef, child);
+    }
+  };
+
+  const emitPrependNode = (parentRef: NodeRef, node: Node) => {
+    if (isSuppressedNode(node)) {
+      return;
+    }
+    const childRef = nodes.findRefFor(node as Node | Element);
+    if (!isStashedRef(childRef)) {
+      return;
+    }
+    emitter.emit(
+      "instruction",
+      PrependChild.serialize({ parent: parentRef, child: childRef.id })
+    );
+  };
+
+  const emitPrependText = (parentRef: NodeRef, child: string) => {
+    emitter.emit(
+      "instruction",
+      PrependChild.serialize({ parent: parentRef, child })
+    );
+  };
+
+  const shouldSuppressSetAttribute = (
+    element: Element,
+    name: string,
+    value: string
+  ): boolean => {
+    if (shouldSkipElementAttribute(element, name, value)) {
+      return true;
+    }
+    if (name === "class" && classAttributeSuppressed.has(element)) {
+      return true;
+    }
+    if (name === "style" && styleAttributeSuppressed.has(element)) {
+      return true;
+    }
+    return false;
+  };
+
+  const shouldSuppressRemoveAttribute = (
+    element: Element,
+    name: string
+  ): boolean => {
+    if (isExecutableAttributeName(name)) {
+      return true;
+    }
+    return isSuppressedAttributeName(element, name);
+  };
+
+  const isExecutableAttributeName = (name: string): boolean => {
+    const lowerName = name.toLowerCase();
+    return lowerName.startsWith("on") || lowerName === "srcdoc";
+  };
+
+  const isSuppressedAttributeName = (
+    element: Element,
+    name: string
+  ): boolean => {
+    if (name === "class") {
+      return classAttributeSuppressed.has(element);
+    }
+    if (name === "style") {
+      return styleAttributeSuppressed.has(element);
+    }
+    return false;
+  };
 
   const originalSetAttribute = ctorWindow.Element.prototype.setAttribute;
   ctorWindow.Element.prototype.setAttribute = function (
@@ -321,18 +436,13 @@ export function extendPrototypes(
   ) {
     const ret = originalSetAttribute.call(this, name, value);
     const ref = nodes.findRefFor(this as Node | Element);
-    if (ref) {
-      if (shouldSkipElementAttribute(this, name, value)) {
-        return ret;
-      }
-      if (name === "class" && classAttributeSuppressed.has(this)) {
-        return ret;
-      }
-      if (name === "style" && styleAttributeSuppressed.has(this)) {
-        return ret;
-      }
-      emitter.emit("instruction", SetAttribute.serialize({ ref, name, value }));
+    if (!ref) {
+      return ret;
     }
+    if (shouldSuppressSetAttribute(this, name, value)) {
+      return ret;
+    }
+    emitter.emit("instruction", SetAttribute.serialize({ ref, name, value }));
     return ret;
   };
 
@@ -340,19 +450,13 @@ export function extendPrototypes(
   ctorWindow.Element.prototype.removeAttribute = function (name: string) {
     const ret = originalRemoveAttribute.call(this, name);
     const ref = nodes.findRefFor(this as Node | Element);
-    if (ref) {
-      const lowerName = name.toLowerCase();
-      if (lowerName.startsWith("on") || lowerName === "srcdoc") {
-        return ret;
-      }
-      if (name === "class" && classAttributeSuppressed.has(this)) {
-        return ret;
-      }
-      if (name === "style" && styleAttributeSuppressed.has(this)) {
-        return ret;
-      }
-      emitter.emit("instruction", RemoveAttribute.serialize({ ref, name }));
+    if (!ref) {
+      return ret;
     }
+    if (shouldSuppressRemoveAttribute(this, name)) {
+      return ret;
+    }
+    emitter.emit("instruction", RemoveAttribute.serialize({ ref, name }));
     return ret;
   };
 
@@ -403,8 +507,8 @@ export function extendPrototypes(
   // Override normal properties
   function extendPrototypeProperties(
     prototype: object,
-    nodes: NodeStash,
-    emitter: DomEmitter
+    _nodes: NodeStash,
+    _emitter: DomEmitter
   ) {
     for (const prop of Object.getOwnPropertyNames(prototype)) {
       const descriptor = Object.getOwnPropertyDescriptor(prototype, prop);

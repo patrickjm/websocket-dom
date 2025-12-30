@@ -2,9 +2,16 @@ import EventEmitter from "node:events";
 import type TypedEmitter from "typed-emitter";
 import type { SerializedEvent } from "./core/protocol/events";
 import type { Serialized } from "./core/ops/instructions";
-import type { InstructionMessage, Message } from "./core/protocol/messages";
+import type {
+  InstructionMessage,
+  Message,
+  SnapshotMessage,
+} from "./core/protocol/messages";
 import type { UiAdapter, UiAdapterFactory } from "./core/adapter/types";
 import type { TransportConnection } from "./core/transport/types";
+import type { AssetProxy, AssetProxyConfig } from "./asset-proxy";
+import { createAssetProxy } from "./asset-proxy";
+import { InstructionType } from "./core/ops/instructions";
 
 export type {
   BaseSerializedEvent,
@@ -31,6 +38,8 @@ export type SyncUIServerSessionOptions = {
   htmlDocument: string;
   url: string;
   adapter?: UiAdapterFactory;
+  sessionId?: string;
+  assetProxy?: Omit<AssetProxyConfig, "sessionId">;
 };
 
 type ConnectionState = {
@@ -52,6 +61,9 @@ export class SyncUIServerSession {
     TransportConnection,
     ConnectionState
   >();
+  private assetProxy: AssetProxy | null = null;
+
+  public readonly sessionId: string;
 
   public readonly worker: UiAdapter["worker"];
 
@@ -62,10 +74,14 @@ export class SyncUIServerSession {
         "SyncUIServerSession requires an adapter. Install syncui-dom and pass adapter."
       );
     }
+    this.sessionId = options.sessionId ?? "default";
     this.dom = adapter(htmlDocument, { url });
     this.worker = this.dom.worker;
     this.publicEmitter =
       new EventEmitter() as TypedEmitter<SyncUIServerSessionEvents>;
+    if (options.assetProxy) {
+      this.enableAssetProxy(options.assetProxy);
+    }
 
     this.dom.emitter.on("instruction", (instruction: Serialized) => {
       for (const connection of this.connections.values()) {
@@ -130,6 +146,33 @@ export class SyncUIServerSession {
     this.connections.delete(transport);
   }
 
+  enableAssetProxy(config: Omit<AssetProxyConfig, "sessionId">): AssetProxy {
+    this.assetProxy = createAssetProxy({
+      ...config,
+      sessionId: this.sessionId,
+    });
+    return this.assetProxy;
+  }
+
+  getAssetProxy() {
+    return this.assetProxy;
+  }
+
+  getAssetProxyUrl(url: string, opts?: { expiresAtMs?: number }) {
+    return this.assetProxy?.getProxyUrl(url, opts) ?? null;
+  }
+
+  setAssetProxyBaseUrl(baseUrl: string) {
+    this.assetProxy?.setBaseUrl(baseUrl);
+  }
+
+  assetProxyHandler() {
+    if (!this.assetProxy) {
+      throw new Error("Asset proxy is not enabled for this session.");
+    }
+    return this.assetProxy.handler;
+  }
+
   import(url: string) {
     this.dom.domImport(url);
   }
@@ -171,6 +214,23 @@ export class SyncUIServerSession {
     connection: ConnectionState,
     force: boolean
   ): Promise<void> {
+    const gate = this.getSnapshotGate(connection, force);
+    if (gate) {
+      return gate;
+    }
+    connection.snapshotInFlight = this.sendSnapshotPayload(
+      connection,
+      force
+    ).finally(() => {
+      connection.snapshotInFlight = null;
+    });
+    return connection.snapshotInFlight;
+  }
+
+  private getSnapshotGate(
+    connection: ConnectionState,
+    force: boolean
+  ): Promise<void> | null {
     if (!force && connection.snapshotSent) {
       return connection.snapshotInFlight ?? Promise.resolve();
     }
@@ -180,16 +240,36 @@ export class SyncUIServerSession {
     if (!connection.transport.isOpen()) {
       return Promise.resolve();
     }
-    if (!force) {
-      connection.snapshotSent = true;
+    return null;
+  }
+
+  private async sendSnapshotPayload(
+    connection: ConnectionState,
+    force: boolean
+  ): Promise<void> {
+    const snapshot = await this.dom.getSnapshot();
+    const payload = this.assetProxy ? this.rewriteSnapshot(snapshot) : snapshot;
+    if (!connection.transport.isOpen()) {
+      return;
     }
-    connection.snapshotInFlight = (async () => {
-      const snapshot = await this.dom.getSnapshot();
-      connection.transport.send(JSON.stringify(snapshot));
-    })().finally(() => {
-      connection.snapshotInFlight = null;
-    });
-    return connection.snapshotInFlight;
+    this.trySendSnapshot(connection, payload, force);
+  }
+
+  private trySendSnapshot(
+    connection: ConnectionState,
+    payload: SnapshotMessage,
+    force: boolean
+  ) {
+    try {
+      connection.transport.send(JSON.stringify(payload));
+      if (!force) {
+        connection.snapshotSent = true;
+      }
+    } catch {
+      if (!force) {
+        connection.snapshotSent = false;
+      }
+    }
   }
 
   private flush(connection: ConnectionState) {
@@ -200,7 +280,11 @@ export class SyncUIServerSession {
     if (!connection.transport.isOpen()) {
       return;
     }
-    const instr = connection.batch.slice();
+    const instr = this.assetProxy
+      ? connection.batch.map((instruction) =>
+          this.rewriteInstruction(instruction)
+        )
+      : connection.batch.slice();
     connection.batch = [];
     connection.transport.send(
       JSON.stringify({
@@ -224,6 +308,143 @@ export class SyncUIServerSession {
       void this.sendSnapshot(connection, true);
     } else if (message.type === "event") {
       this.dispatchEvent(message.event);
+    } else if (message.type === "navigate") {
+      void this.handleNavigate(message.url);
     }
+  }
+
+  private async handleNavigate(url: string) {
+    if (this.assetProxy) {
+      this.assetProxy.setBaseUrl(url);
+    }
+    if (this.worker) {
+      this.postWorkerMessage({ type: "navigate", url });
+    } else {
+      await this.dom.evalString(
+        `document.dispatchEvent(new CustomEvent("syncui:navigate",{detail:${JSON.stringify(
+          url
+        )}}))`
+      );
+    }
+    for (const connection of this.connections.values()) {
+      void this.sendSnapshot(connection, true);
+    }
+  }
+
+  private rewriteSnapshot(snapshot: SnapshotMessage) {
+    if (!this.assetProxy) {
+      return snapshot;
+    }
+    const rewriteAttributes = (attrs: [string, string][]) => {
+      return attrs.map(([name, value]) => [
+        name,
+        this.rewriteAttributeValue(name, value),
+      ]) as [string, string][];
+    };
+    return {
+      ...snapshot,
+      htmlAttributes: rewriteAttributes(snapshot.htmlAttributes),
+      headAttributes: rewriteAttributes(snapshot.headAttributes),
+      bodyAttributes: rewriteAttributes(snapshot.bodyAttributes),
+      headHtml: this.assetProxy.rewriteHtml(snapshot.headHtml),
+      bodyHtml: this.assetProxy.rewriteHtml(snapshot.bodyHtml),
+    };
+  }
+
+  private rewriteInstruction(instruction: Serialized): Serialized {
+    if (!this.assetProxy) {
+      return instruction;
+    }
+    const type = instruction[0] as InstructionType;
+    if (type === InstructionType.SetAttribute) {
+      const name = instruction[2] as string;
+      const value = instruction[3] as string;
+      const nextValue = this.rewriteAttributeValue(name, value);
+      return [instruction[0], instruction[1], name, nextValue] as Serialized;
+    }
+    if (type === InstructionType.SetProperty) {
+      const name = instruction[2] as string;
+      const value = instruction[3] as string;
+      const nextValue = this.rewritePropertyValue(name, value);
+      return [instruction[0], instruction[1], name, nextValue] as Serialized;
+    }
+    if (type === InstructionType.InsertAdjacentHTML) {
+      const html = instruction[3] as string;
+      const nextHtml = this.assetProxy.rewriteHtml(html);
+      return [
+        instruction[0],
+        instruction[1],
+        instruction[2],
+        nextHtml,
+      ] as Serialized;
+    }
+    return instruction;
+  }
+
+  private rewritePropertyValue(name: string, value: string) {
+    if (!this.assetProxy) {
+      return value;
+    }
+    const lower = name.toLowerCase();
+    if (lower === "innerhtml" || lower === "outerhtml") {
+      return this.assetProxy.rewriteHtml(value);
+    }
+    if (lower === "style" || lower === "csstext") {
+      return this.assetProxy.rewriteCss(value);
+    }
+    if (lower === "src" || lower === "href") {
+      return this.assetProxy.getProxyUrl(value) ?? value;
+    }
+    return value;
+  }
+
+  private rewriteAttributeValue(name: string, value: string) {
+    if (!this.assetProxy) {
+      return value;
+    }
+    const lower = name.toLowerCase();
+    if (lower === "style") {
+      return this.assetProxy.rewriteCss(value);
+    }
+    if (lower === "srcset") {
+      return this.rewriteSrcSet(value);
+    }
+    if (
+      [
+        "href",
+        "src",
+        "action",
+        "formaction",
+        "poster",
+        "data",
+        "xlink:href",
+      ].includes(lower)
+    ) {
+      return this.assetProxy.getProxyUrl(value) ?? value;
+    }
+    return value;
+  }
+
+  private rewriteSrcSet(value: string) {
+    if (!this.assetProxy) {
+      return value;
+    }
+    const parts = value
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    return parts
+      .map((part) => {
+        const [rawUrl, ...rest] = part.split(/\s+/);
+        if (!rawUrl) {
+          return part;
+        }
+        const rewritten = this.assetProxy?.getProxyUrl(rawUrl);
+        if (!rewritten) {
+          return part;
+        }
+        return [rewritten, ...rest].join(" ");
+      })
+      .join(", ");
   }
 }

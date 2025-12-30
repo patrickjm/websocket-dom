@@ -25,6 +25,11 @@ export interface ResyncMessage {
   type: "resync";
 }
 
+export interface NavigateMessage {
+  type: "navigate";
+  url: string;
+}
+
 export interface SnapshotMessage {
   type: "snapshot";
   htmlAttributes: [string, string][];
@@ -40,4 +45,5 @@ export type Message =
   | EventMessage
   | ReadyMessage
   | ResyncMessage
+  | NavigateMessage
   | SnapshotMessage;
