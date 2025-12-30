@@ -83,13 +83,13 @@ container.appendChild(link);
 
 const script = document.createElement('script');
 script.id = 'blocked-script';
-script.textContent = 'document.body.dataset.scriptRan = \"yes\";';
+script.textContent = 'document.body.dataset.scriptRan = "yes";';
 document.body.appendChild(script);
 
 const htmlContainer = document.createElement('div');
 htmlContainer.id = 'html-container';
 document.body.appendChild(htmlContainer);
-htmlContainer.insertAdjacentHTML('beforeend', '<script id=\"html-script\">document.body.dataset.htmlScriptRan = \"yes\";</script><div id=\"html-safe\">safe</div>');
+htmlContainer.insertAdjacentHTML('beforeend', '<script id="html-script">document.body.dataset.htmlScriptRan = "yes";</script><div id="html-safe">safe</div>');
 `;
 
 const resyncScript = `

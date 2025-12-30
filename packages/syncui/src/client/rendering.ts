@@ -1,7 +1,7 @@
 // import { NodeStash, type StashedIdNodeRef } from "../dom/nodes";
 // import { InstructionType, type Deserialized } from "../dom/instructions";
 
-export {}
+export {};
 
 // export function resolveXPath(xpath: string): Element | null {
 //   return document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue as Element | null;
@@ -22,7 +22,7 @@ export {}
 //     case InstructionType.SetProperty:
 //       const setPropElement = nodes.get(instruction.ref);
 //       if (setPropElement && setPropElement instanceof Element) {
-//         // @ts-ignore
+//         // @ts-expect-error
 //         setPropElement[instruction.name] = instruction.value;
 //       }
 //       break;

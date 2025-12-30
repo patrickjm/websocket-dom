@@ -1,6 +1,4 @@
-import { Simulate } from "react-dom/test-utils";
 import type { MessageToWorker } from "./shared-utils";
-import { fireEvent } from "@testing-library/react";
 
 addEventListener("message", (event: MessageEvent<MessageToWorker>) => {
   if (event.data.type === "_react_event") {

@@ -28,7 +28,7 @@ export function createClientDomAdapter(
   extendPrototypes(windowRef, nodes, emitter);
 
   function domImport(moduleUrl: string) {
-    // syncui-allow-inline-import: client adapter loads worker script URLs on demand.
+    // biome-ignore lint/plugin: client adapter loads worker script URLs on demand.
     import(moduleUrl).catch((err) => {
       console.error(`Error importing ${moduleUrl}: ${String(err)}`);
     });

@@ -1,0 +1,9 @@
+language js;
+
+`import($arg)` where {
+    register_diagnostic(
+        span = $arg,
+        message = "Avoid inline import(); use top-level imports unless explicitly exempted.",
+        severity = "error"
+    )
+}

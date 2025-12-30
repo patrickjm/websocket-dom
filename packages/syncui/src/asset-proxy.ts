@@ -140,8 +140,8 @@ const rewriteCssUrls = (
   baseUrl: string,
   rewrite: (url: string) => string | null
 ) => {
-  const urlPattern = /url\(\s*(['"]?)([^'"\)]+)\1\s*\)/gi;
-  const importPattern = /@import\s+(?:url\()?\s*['"]?([^'"\)\s]+)['"]?\s*\)?/gi;
+  const urlPattern = /url\(\s*(['"]?)([^'")]+)\1\s*\)/gi;
+  const importPattern = /@import\s+(?:url\()?\s*['"]?([^'")\s]+)['"]?\s*\)?/gi;
   const replaceUrl = (value: string) => {
     if (!isSafeUrl(value)) {
       return value;

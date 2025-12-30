@@ -136,7 +136,7 @@ export function createJsdomAdapter(
   function domImport(moduleUrl: string) {
     void enqueueGlobals(() =>
       withGlobalsAsync(async () => {
-        // syncui-allow-inline-import: server adapter loads user worker modules on demand.
+        // biome-ignore lint/plugin: server adapter loads user worker modules on demand.
         await import(moduleUrl);
       })
     ).catch((err) => {
