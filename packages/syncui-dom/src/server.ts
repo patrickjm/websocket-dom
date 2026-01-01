@@ -1,4 +1,9 @@
-export { SyncUIServerSession, createWebSocketServerTransport } from "syncui";
+export { SyncUISession, createWebSocketServerTransport } from "syncui";
+export {
+  SyncUIDomWindow,
+  createDomWindow,
+  type SyncUIDomWindowOptions,
+} from "./window";
 export {
   createJsdomAdapter,
   type JsdomAdapterDeps,

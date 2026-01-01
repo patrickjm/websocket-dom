@@ -5,8 +5,8 @@
   "version": "0.0.0",
   "packageManager": "yarn@1.22.22",
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "dev": "yarn workspace syncui build:server && yarn workspace syncui-dom build && yarn build && tsx src/server.ts",
+    "build": "yarn workspace syncui build && yarn workspace syncui-dom build && node scripts/build.mjs",
+    "dev": "yarn workspace syncui build:server && yarn workspace syncui build:client && yarn workspace syncui-dom build && yarn build && tsx src/server.ts",
     "start": "node dist/server.js"
   },
   "dependencies": {

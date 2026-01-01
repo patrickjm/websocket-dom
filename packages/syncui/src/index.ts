@@ -30,11 +30,11 @@ export { getXPath } from "./shared-utils";
 export { createWebSocketServerTransport } from "./transport/ws-server";
 export { createWebSocketClientTransport } from "./transport/ws-client";
 
-export type SyncUIServerSessionEvents = {
+export type SyncUISessionEvents = {
   clientEvent: (event: SerializedEvent) => void;
 };
 
-export type SyncUIServerSessionOptions = {
+export type SyncUISessionOptions = {
   htmlDocument: string;
   url: string;
   adapter?: UiAdapterFactory;
@@ -54,9 +54,9 @@ type ConnectionState = {
   closeUnsubscribe: () => void;
 };
 
-export class SyncUIServerSession {
+export class SyncUISession {
   private readonly dom: UiAdapter;
-  private readonly publicEmitter: TypedEmitter<SyncUIServerSessionEvents>;
+  private readonly publicEmitter: TypedEmitter<SyncUISessionEvents>;
   private readonly connections = new Map<
     TransportConnection,
     ConnectionState
@@ -67,18 +67,18 @@ export class SyncUIServerSession {
 
   public readonly worker: UiAdapter["worker"];
 
-  constructor(options: SyncUIServerSessionOptions) {
+  constructor(options: SyncUISessionOptions) {
     const { htmlDocument, url, adapter } = options;
     if (!adapter) {
       throw new Error(
-        "SyncUIServerSession requires an adapter. Install syncui-dom and pass adapter."
+        "SyncUISession requires an adapter. Install syncui-dom and pass adapter."
       );
     }
     this.sessionId = options.sessionId ?? "default";
     this.dom = adapter(htmlDocument, { url });
     this.worker = this.dom.worker;
     this.publicEmitter =
-      new EventEmitter() as TypedEmitter<SyncUIServerSessionEvents>;
+      new EventEmitter() as TypedEmitter<SyncUISessionEvents>;
     if (options.assetProxy) {
       this.enableAssetProxy(options.assetProxy);
     }
@@ -131,6 +131,10 @@ export class SyncUIServerSession {
     };
 
     this.connections.set(transport, connection);
+  }
+
+  navigate(url: string) {
+    return this.handleNavigate(url);
   }
 
   removeConnection(transport: TransportConnection) {
@@ -320,11 +324,22 @@ export class SyncUIServerSession {
     if (this.worker) {
       this.postWorkerMessage({ type: "navigate", url });
     } else {
-      await this.dom.evalString(
-        `document.dispatchEvent(new CustomEvent("syncui:navigate",{detail:${JSON.stringify(
-          url
-        )}}))`
-      );
+      const code = `
+        new Promise((resolve) => {
+          let resolved = false;
+          const done = () => {
+            if (resolved) {
+              return;
+            }
+            resolved = true;
+            resolve(undefined);
+          };
+          const detail = { url: ${JSON.stringify(url)}, resolve: done };
+          document.dispatchEvent(new CustomEvent("syncui:navigate", { detail }));
+          setTimeout(done, 5000);
+        });
+      `;
+      await this.dom.evalString(code);
     }
     for (const connection of this.connections.values()) {
       void this.sendSnapshot(connection, true);

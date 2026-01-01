@@ -25,6 +25,7 @@
     "build:e2e": "vite build -c e2e/vite.config.ts",
     "clean": "touch ./dist && rm -r ./dist",
     "build": "yarn clean && yarn build:types && yarn build:server && yarn build:client",
+    "test:unit": "node --import tsx --test src/**/*.test.ts",
     "e2e": "SYNCUI_ADAPTER=jsdom SYNCUI_PORT=3333 SYNCUI_BASE_URL=http://localhost:3333 playwright test && SYNCUI_ADAPTER=playwright SYNCUI_PORT=3334 SYNCUI_BASE_URL=http://localhost:3334 playwright test --workers=1",
     "lint": "biome lint \"src\" \"e2e\"",
     "e2e:server": "node --import tsx e2e/setup/start-server.ts",

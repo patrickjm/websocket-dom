@@ -1,1 +1,1 @@
-export { SyncUIServerSession, createWebSocketServerTransport } from "./index";
+export { SyncUISession, createWebSocketServerTransport } from "./index";

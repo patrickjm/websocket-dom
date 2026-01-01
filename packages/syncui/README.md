@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import http from "http";
 import { WebSocketServer } from "ws";
-import { SyncUIServerSession } from "syncui";
+import { SyncUISession } from "syncui";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";
 import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
 import { JSDOM } from "jsdom";
@@ -56,7 +56,7 @@ const wss = new WebSocketServer({ server });
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const doc = '<!DOCTYPE html><html><body></body></html>';
-const wsDom = new SyncUIServerSession({
+const wsDom = new SyncUISession({
   htmlDocument: doc,
   url: 'http://localhost:3000',
   adapter: (document, options) => createJsdomAdapter(document, options, { JSDOM }),
@@ -90,6 +90,9 @@ export const client = new SyncUIClient("ws://localhost:3000", {
   },
 });
 client.connect();
+
+// Optional: ask the server to navigate and resync.
+client.navigate("https://example.com");
 ```
 
 ## How it works

@@ -3,9 +3,8 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { SyncUIServerSession } from "syncui";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";
-import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
+import { createDomWindow } from "syncui-dom/server";
 import { JSDOM } from "jsdom";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,12 +19,15 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const sessionId = "hn";
-const session = new SyncUIServerSession({
-  htmlDocument: "<!doctype html><html><head></head><body></body></html>",
+const session = createDomWindow({
   url: `http://localhost:${port}`,
-  adapter: (document, options) =>
-    createJsdomAdapter(document, options, { JSDOM }, { resources: "none" }),
+  html: "<!doctype html><html><head></head><body></body></html>",
   sessionId,
+  adapter: {
+    type: "jsdom",
+    deps: { JSDOM },
+    options: { resources: "none" },
+  },
 });
 
 session.enableAssetProxy({
@@ -33,19 +35,16 @@ session.enableAssetProxy({
   allowUrl: (target) => target.origin === "https://news.ycombinator.com",
 });
 
-session.import(workerPath);
+session.domImport(workerPath);
+setTimeout(() => {
+  void session.navigate("https://news.ycombinator.com/");
+}, 0);
 
 wss.on("connection", (ws) => {
   session.addConnection(createWebSocketServerTransport(ws));
 });
 
-app.get("/syncui/:session/assets/*", async (req, res) => {
-  if (req.params.session !== sessionId) {
-    res.status(404).end("not found");
-    return;
-  }
-  await session.assetProxyHandler()(req, res);
-});
+app.use(session.assetProxyRouter());
 
 app.use(express.static(clientDir));
 app.get("/", (_req, res) => {

@@ -1,7 +1,11 @@
 import crypto from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { parseFragment, serialize } from "parse5";
-import type { DefaultTreeAdapterMap } from "parse5";
+import {
+  createAssetRewriter,
+  isSafeUrl,
+  resolveUrl,
+  type AssetRewrite,
+} from "./asset-rewrite";
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 
@@ -20,9 +24,14 @@ export type AssetProxy = {
   readonly baseUrl: string;
   setBaseUrl: (baseUrl: string) => void;
   getProxyUrl: (url: string, opts?: { expiresAtMs?: number }) => string | null;
-  rewriteHtml: (html: string) => string;
-  rewriteCss: (css: string, baseUrl?: string) => string;
+  rewriteHtml: AssetRewrite["rewriteHtml"];
+  rewriteCss: AssetRewrite["rewriteCss"];
   handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+  handlerWithBase: (
+    req: IncomingMessage,
+    res: ServerResponse,
+    basePath: string
+  ) => Promise<void>;
 };
 
 type ParsedProxyPath = {
@@ -41,18 +50,6 @@ const toBase64Url = (buffer: Buffer) =>
 
 const fromBase64Url = (value: string) =>
   value.replace(/-/g, "+").replace(/_/g, "/");
-
-const isSafeUrl = (raw: string) => {
-  const trimmed = raw.trim().toLowerCase();
-  return !(
-    trimmed.startsWith("data:") ||
-    trimmed.startsWith("javascript:") ||
-    trimmed.startsWith("blob:") ||
-    trimmed.startsWith("mailto:") ||
-    trimmed.startsWith("tel:") ||
-    trimmed.startsWith("#")
-  );
-};
 
 const getSessionSecret = (masterSecret: string, sessionId: string) => {
   const hmac = crypto.createHmac("sha256", masterSecret);
@@ -80,18 +77,26 @@ const timingSafeEquals = (a: string, b: string) => {
   return crypto.timingSafeEqual(bufferA, bufferB);
 };
 
-const parseProxyPath = (url: URL): ParsedProxyPath | null => {
+const parseProxyPathFromBase = (
+  url: URL,
+  basePath: string
+): ParsedProxyPath | null => {
   const segments = url.pathname.split("/").filter(Boolean);
   if (segments.length < 5) {
     return null;
   }
-  if (segments[0] !== "syncui" || segments[2] !== "assets") {
+  const expected = basePath.split("/").filter(Boolean);
+  const prefix = segments.slice(0, expected.length);
+  if (
+    prefix.join("/") !== expected.join("/") ||
+    segments[expected.length + 1] !== "assets"
+  ) {
     return null;
   }
-  const sessionId = segments[1];
-  const exp = Number(segments[3]);
-  const token = segments[4];
-  const encodedUrl = segments.slice(5).join("/");
+  const sessionId = segments[expected.length];
+  const exp = Number(segments[expected.length + 2]);
+  const token = segments[expected.length + 3];
+  const encodedUrl = segments.slice(expected.length + 4).join("/");
   if (!(sessionId && token) || Number.isNaN(exp)) {
     return null;
   }
@@ -102,175 +107,6 @@ const parseProxyPath = (url: URL): ParsedProxyPath | null => {
     url: decodeURIComponent(encodedUrl),
   };
 };
-
-const rewriteSrcSet = (
-  value: string,
-  baseUrl: string,
-  rewrite: (url: string) => string | null
-) => {
-  const parts = value
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  return parts
-    .map((part) => {
-      const [rawUrl, ...rest] = part.split(/\s+/);
-      if (!rawUrl) {
-        return part;
-      }
-      const resolved = rewrite(resolveUrl(rawUrl, baseUrl));
-      if (!resolved) {
-        return part;
-      }
-      return [resolved, ...rest].join(" ");
-    })
-    .join(", ");
-};
-
-const resolveUrl = (raw: string, baseUrl: string) => {
-  try {
-    return new URL(raw, baseUrl).toString();
-  } catch {
-    return raw;
-  }
-};
-
-const rewriteCssUrls = (
-  css: string,
-  baseUrl: string,
-  rewrite: (url: string) => string | null
-) => {
-  const urlPattern = /url\(\s*(['"]?)([^'")]+)\1\s*\)/gi;
-  const importPattern = /@import\s+(?:url\()?\s*['"]?([^'")\s]+)['"]?\s*\)?/gi;
-  const replaceUrl = (value: string) => {
-    if (!isSafeUrl(value)) {
-      return value;
-    }
-    const resolved = rewrite(resolveUrl(value, baseUrl));
-    return resolved ?? value;
-  };
-  const withImports = css.replace(importPattern, (match, url) => {
-    const rewritten = replaceUrl(url);
-    if (rewritten === url) {
-      return match;
-    }
-    return match.replace(url, rewritten);
-  });
-  return withImports.replace(urlPattern, (match, _quote, url) => {
-    const rewritten = replaceUrl(url);
-    if (rewritten === url) {
-      return match;
-    }
-    return `url("${rewritten}")`;
-  });
-};
-
-const rewriteHtmlUrls = (
-  html: string,
-  baseUrl: string,
-  rewrite: (url: string) => string | null
-) => {
-  const fragment = parseFragment(html);
-  walkHtmlNodes(fragment, (node) => {
-    if (!isElementNode(node)) {
-      return;
-    }
-    rewriteElementAttributes(node, baseUrl, rewrite);
-    rewriteStyleTag(node, baseUrl, rewrite);
-  });
-  return serialize(fragment);
-};
-
-const walkHtmlNodes = (
-  root: DefaultTreeAdapterMap["node"],
-  visit: (node: DefaultTreeAdapterMap["node"]) => void
-) => {
-  const stack: DefaultTreeAdapterMap["node"][] = [root];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (!(node && "childNodes" in node)) {
-      continue;
-    }
-    for (const child of node.childNodes ?? []) {
-      stack.push(child);
-      visit(child);
-    }
-  }
-};
-
-const isElementNode = (
-  node: DefaultTreeAdapterMap["node"]
-): node is DefaultTreeAdapterMap["element"] =>
-  "tagName" in node && "attrs" in node;
-
-const rewriteElementAttributes = (
-  node: DefaultTreeAdapterMap["element"],
-  baseUrl: string,
-  rewrite: (url: string) => string | null
-) => {
-  if (!node.attrs) {
-    return;
-  }
-  const attrs = node.attrs as { name: string; value: string }[];
-  const tag = node.tagName.toLowerCase();
-  for (const attr of attrs) {
-    const updated = rewriteAttributeValue(tag, attr, baseUrl, rewrite);
-    if (updated !== null) {
-      attr.value = updated;
-    }
-  }
-};
-
-const rewriteAttributeValue = (
-  tag: string,
-  attr: { name: string; value: string },
-  baseUrl: string,
-  rewrite: (url: string) => string | null
-): string | null => {
-  const name = attr.name.toLowerCase();
-  if (name === "style") {
-    return rewriteCssUrls(attr.value, baseUrl, rewrite);
-  }
-  if (name === "srcset") {
-    return rewriteSrcSet(attr.value, baseUrl, rewrite);
-  }
-  if (!(shouldRewriteUrl(tag, name) && isSafeUrl(attr.value))) {
-    return null;
-  }
-  const resolved = rewrite(resolveUrl(attr.value, baseUrl));
-  return resolved ?? null;
-};
-
-const shouldRewriteUrl = (tag: string, attrName: string): boolean => {
-  if (attrName === "xlink:href") {
-    return true;
-  }
-  if (attrName === "href") {
-    return tag === "link";
-  }
-  return ["src", "poster", "data"].includes(attrName);
-};
-
-const rewriteStyleTag = (
-  node: DefaultTreeAdapterMap["element"],
-  baseUrl: string,
-  rewrite: (url: string) => string | null
-) => {
-  if (node.tagName.toLowerCase() !== "style" || !("childNodes" in node)) {
-    return;
-  }
-  for (const child of node.childNodes ?? []) {
-    if (!(isTextNode(child) && child.value)) {
-      continue;
-    }
-    child.value = rewriteCssUrls(child.value, baseUrl, rewrite);
-  }
-};
-
-const isTextNode = (
-  node: DefaultTreeAdapterMap["node"]
-): node is DefaultTreeAdapterMap["textNode"] =>
-  "nodeName" in node && node.nodeName === "#text";
 
 type ProxyError = { status: number; body: string };
 
@@ -321,10 +157,11 @@ const parseProxyRequest = (
   req: IncomingMessage,
   sessionId: string,
   sessionSecret: Buffer,
-  allowUrl: AllowUrl
+  allowUrl: AllowUrl,
+  basePath: string
 ): { target: URL } | { error: ProxyError } => {
   const url = new URL(req.url ?? "", "http://localhost");
-  const parsed = parseProxyPath(url);
+  const parsed = parseProxyPathFromBase(url, basePath);
   if (!parsed || parsed.sessionId !== sessionId) {
     return { error: { status: 404, body: "not found" } };
   }
@@ -400,12 +237,26 @@ export const createAssetProxy = (config: AssetProxyConfig): AssetProxy => {
     return `/syncui/${config.sessionId}/assets/${exp}/${token}/${encoded}`;
   };
 
+  const rewriter = createAssetRewriter(
+    () => baseUrl,
+    (url) => getProxyUrl(url)
+  );
+
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
+    return handlerWithBase(req, res, "/syncui");
+  };
+
+  const handlerWithBase = async (
+    req: IncomingMessage,
+    res: ServerResponse,
+    basePath: string
+  ) => {
     const parsed = parseProxyRequest(
       req,
       config.sessionId,
       sessionSecret,
-      allowUrl
+      allowUrl,
+      basePath
     );
     if ("error" in parsed) {
       respondWithError(res, parsed.error);
@@ -417,7 +268,12 @@ export const createAssetProxy = (config: AssetProxyConfig): AssetProxy => {
     res.statusCode = response.status;
 
     if (isCssResponse(contentType)) {
-      await sendCssResponse(res, response, target.toString(), rewriteCss);
+      await sendCssResponse(
+        res,
+        response,
+        target.toString(),
+        rewriter.rewriteCss
+      );
       return;
     }
 
@@ -428,11 +284,8 @@ export const createAssetProxy = (config: AssetProxyConfig): AssetProxy => {
     res.end(Buffer.from(body));
   };
 
-  const rewriteHtml = (html: string) =>
-    rewriteHtmlUrls(html, baseUrl, (url) => getProxyUrl(url));
-
-  const rewriteCss = (css: string, overrideBaseUrl?: string) =>
-    rewriteCssUrls(css, overrideBaseUrl ?? baseUrl, (url) => getProxyUrl(url));
+  const rewriteHtml = rewriter.rewriteHtml;
+  const rewriteCss = rewriter.rewriteCss;
 
   return {
     sessionId: config.sessionId,
@@ -444,5 +297,6 @@ export const createAssetProxy = (config: AssetProxyConfig): AssetProxy => {
     rewriteHtml,
     rewriteCss,
     handler,
+    handlerWithBase,
   };
 };

@@ -53,6 +53,7 @@ const readImports = (filePath, sourceText) => {
 };
 
 const allowComment = "syncui-allow-inline-import";
+const allowGlobalComment = "syncui-allow-global";
 
 const boundaryRules = [
   {
@@ -159,6 +160,31 @@ const collectRequireViolations = (
   visit(sourceFile);
 };
 
+const isSyncuiGlobalAccess = (node) =>
+  ts.isPropertyAccessExpression(node) &&
+  ts.isIdentifier(node.name) &&
+  node.name.text.startsWith("__syncui");
+
+const collectSyncuiGlobalViolations = (
+  sourceFile,
+  sourceText,
+  violations,
+  filePath
+) => {
+  const visit = (node) => {
+    if (isSyncuiGlobalAccess(node) && !hasAllowComment(sourceText, node)) {
+      violations.push({
+        filePath,
+        specifier: node.getText(sourceFile),
+        reason:
+          "avoid __syncui* globals; use explicit APIs or scoped state instead",
+      });
+    }
+    node.forEachChild(visit);
+  };
+  visit(sourceFile);
+};
+
 const main = async () => {
   const targets = [
     path.join(repoRoot, "packages", "syncui", "src"),
@@ -176,6 +202,7 @@ const main = async () => {
       checkBoundaryRules(filePath, imports, violations);
     }
     collectRequireViolations(sourceFile, sourceText, violations, filePath);
+    collectSyncuiGlobalViolations(sourceFile, sourceText, violations, filePath);
   }
 
   if (violations.length > 0) {

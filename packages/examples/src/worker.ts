@@ -16,6 +16,8 @@ const getDocument = (): Document | null => {
   return scope.document ?? scope.window?.document ?? null;
 };
 
+const docRef = getDocument();
+
 const parseHtml = (doc: Document, html: string) => {
   const parsed = doc.implementation.createHTMLDocument("");
   parsed.documentElement.innerHTML = html;
@@ -43,16 +45,15 @@ const fetchHtml = async (url: string) => {
 };
 
 const applyHtml = async (url: string) => {
-  const doc = getDocument();
-  if (!doc) {
+  if (!docRef) {
     return;
   }
   const html = await fetchHtml(url);
   if (!html) {
     return;
   }
-  const parsed = parseHtml(doc, html);
-  updateDocument(doc, parsed);
+  const parsed = parseHtml(docRef, html);
+  updateDocument(docRef, parsed);
 };
 
 const navigate = async (url: string) => {
@@ -60,15 +61,27 @@ const navigate = async (url: string) => {
 };
 
 const registerNavigateListener = () => {
-  const doc = getDocument();
-  if (!doc) {
+  if (!docRef) {
     return;
   }
-  doc.addEventListener("syncui:navigate", (event) => {
-    const detail = (event as CustomEvent<string>).detail;
-    if (detail) {
-      void navigate(detail);
+  docRef.addEventListener("syncui:navigate", (event) => {
+    const detail = (
+      event as CustomEvent<string | { url: string; resolve?: () => void }>
+    ).detail;
+    const url =
+      typeof detail === "string"
+        ? detail
+        : detail && "url" in detail
+        ? detail.url
+        : "";
+    if (!url) {
+      return;
     }
+    void navigate(url).finally(() => {
+      if (detail && typeof detail === "object" && "resolve" in detail) {
+        detail.resolve?.();
+      }
+    });
   });
 };
 
@@ -86,5 +99,3 @@ const registerWorkerListener = () => {
 
 registerNavigateListener();
 registerWorkerListener();
-
-await applyHtml("https://news.ycombinator.com/");

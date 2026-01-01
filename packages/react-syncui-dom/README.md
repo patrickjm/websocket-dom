@@ -12,16 +12,16 @@ yarn add react-syncui-dom syncui syncui-dom
 
 ## Usage
 
-`loadReactSyncUiDom` expects a small adapter with `import`, `on`, and `postWorkerMessage` methods. You can build one from `SyncUIServerSession` like this:
+`loadReactSyncUiDom` expects a small adapter with `import`, `on`, and `postWorkerMessage` methods. You can build one from `SyncUISession` like this:
 
 ```ts
-import { SyncUIServerSession } from "syncui";
+import { SyncUISession } from "syncui";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";
 import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
 import { JSDOM } from "jsdom";
 import { loadReactSyncUiDom } from "react-syncui-dom";
 
-const wsDom = new SyncUIServerSession({
+const wsDom = new SyncUISession({
   htmlDocument: doc,
   url,
   adapter: (document, options) => createJsdomAdapter(document, options, { JSDOM }),

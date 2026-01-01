@@ -656,10 +656,10 @@ export function extendPrototypes(
       return mapped;
     }
     const maybe = list as DomTokenListWithElement;
-    if (maybe._element instanceof Element) {
+    if (maybe._element instanceof ctorWindow.Element) {
       return maybe._element;
     }
-    if (maybe.ownerElement instanceof Element) {
+    if (maybe.ownerElement instanceof ctorWindow.Element) {
       return maybe.ownerElement;
     }
     return null;
@@ -756,10 +756,10 @@ export function extendPrototypes(
       return mapped;
     }
     const maybe = style as StyleDeclarationWithElement;
-    if (maybe._element instanceof Element) {
+    if (maybe._element instanceof ctorWindow.Element) {
       return maybe._element;
     }
-    if (maybe.ownerElement instanceof Element) {
+    if (maybe.ownerElement instanceof ctorWindow.Element) {
       return maybe.ownerElement;
     }
     return null;

@@ -12,7 +12,7 @@
     "tsconfig.json"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "test": "echo \"no tests\"",
     "lint": "biome lint \"src\""
   },

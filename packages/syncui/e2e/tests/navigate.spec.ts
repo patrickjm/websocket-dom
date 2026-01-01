@@ -10,12 +10,14 @@ const script = `
   document.body.appendChild(link);
 
   document.addEventListener("syncui:navigate", (event) => {
-    const url = event.detail;
+    const detail = event.detail;
+    const url = typeof detail === "string" ? detail : detail?.url;
     if (!url) {
       return;
     }
     document.title = "NAV:" + url;
     document.body.innerHTML = "<div id=\\"nav-output\\">" + url + "</div>";
+    detail?.resolve?.();
   });
 `;
 
@@ -39,13 +41,11 @@ test("clicking a link triggers navigate and resync", async ({ page }) => {
         const client = (
           window as {
             syncuiTestBridge?: {
-              client?: { transport?: { send: (payload: string) => void } };
+              client?: { navigate?: (url: string) => void };
             };
           }
         ).syncuiTestBridge?.client;
-        client?.transport?.send(
-          JSON.stringify({ type: "navigate", url: link.href })
-        );
+        client?.navigate?.(link.href);
       },
       true
     );

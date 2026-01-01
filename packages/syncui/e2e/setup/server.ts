@@ -3,14 +3,17 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { SyncUIServerSession } from "../../src";
+import { SyncUIDomWindow } from "syncui-dom/server";
 import { createWebSocketServerTransport } from "syncui/transport-ws/server";
-import { createJsdomAdapter } from "syncui-dom/adapter-server-jsdom";
-import { createPlaywrightAdapter } from "syncui-dom/adapter-server-playwright";
 import { JSDOM } from "jsdom";
 import { chromium, type Browser, type Page } from "@playwright/test";
-import type { UiAdapterFactory } from "../../src/core/adapter/types";
 import { ASSET_PROXY_SECRET } from "./asset-proxy";
+import {
+  NAV_ORIGIN_A,
+  NAV_ORIGIN_B,
+  NAV_PORT_A,
+  NAV_PORT_B,
+} from "./navigation-origins";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,18 +22,24 @@ export class TestServer {
   private server: http.Server;
   private wss: WebSocketServer;
   private port: number;
-  private sessions = new Map<string, SyncUIServerSession>();
-  private sessionPromises = new Map<string, Promise<SyncUIServerSession>>();
+  private sessions = new Map<string, SyncUIDomWindow>();
+  private sessionPromises = new Map<string, Promise<SyncUIDomWindow>>();
   private playwrightPages = new Map<string, Page>();
   private playwrightBrowser: Browser | null = null;
   private baseDoc: string;
   private adapter: "jsdom" | "playwright";
+  private navServerA: http.Server;
+  private navServerB: http.Server;
+  private navPortA: number;
+  private navPortB: number;
 
   constructor() {
     this.app = express();
     this.server = http.createServer(this.app);
     this.wss = new WebSocketServer({ server: this.server });
     this.port = Number(process.env.SYNCUI_PORT ?? 3333);
+    this.navPortA = NAV_PORT_A;
+    this.navPortB = NAV_PORT_B;
     this.adapter =
       process.env.SYNCUI_ADAPTER === "playwright" ? "playwright" : "jsdom";
     this.baseDoc =
@@ -62,6 +71,34 @@ export class TestServer {
     });
 
     this.app.use(express.static(path.join(__dirname, "../dist")));
+
+    const navAppA = express();
+    const navAppB = express();
+    navAppA.use((_req, res, next) => {
+      res.setHeader("access-control-allow-origin", "*");
+      next();
+    });
+    navAppB.use((_req, res, next) => {
+      res.setHeader("access-control-allow-origin", "*");
+      next();
+    });
+
+    navAppA.get("/", (_req, res) => {
+      res.type("text/html");
+      res.send(
+        `<html><head><title>Origin A</title></head><body><div id="nav-page" data-page="a">A</div><a id="nav-link" href="${NAV_ORIGIN_B}/">to B</a></body></html>`
+      );
+    });
+
+    navAppB.get("/", (_req, res) => {
+      res.type("text/html");
+      res.send(
+        `<html><head><title>Origin B</title></head><body><div id="nav-page" data-page="b">B</div><a id="nav-link" href="${NAV_ORIGIN_A}/">to A</a></body></html>`
+      );
+    });
+
+    this.navServerA = http.createServer(navAppA);
+    this.navServerB = http.createServer(navAppB);
   }
 
   private async handleConnection(
@@ -93,6 +130,23 @@ export class TestServer {
             );
           });
       }
+      if (message.type === "e2e-eval" && message.code) {
+        void this.getSession(sessionId)
+          .then((session) => session.evalString(message.code))
+          .catch((error) => {
+            console.error(
+              `Failed to eval test script for session ${sessionId}:`,
+              error
+            );
+          });
+      }
+      if (message.type === "e2e-navigate" && message.url) {
+        void this.getSession(sessionId)
+          .then((session) => session.navigate(message.url))
+          .catch((error) => {
+            console.error(`Failed to navigate session ${sessionId}:`, error);
+          });
+      }
     });
   }
 
@@ -108,17 +162,18 @@ export class TestServer {
     const created = (async () => {
       try {
         const url = `http://localhost:${this.port}`;
-        const adapter =
+        const session =
           this.adapter === "playwright"
-            ? await this.createPlaywrightAdapter(sessionId, url)
-            : (document: string, options: { url: string }) =>
-                createJsdomAdapter(document, options, { JSDOM });
-        const session = new SyncUIServerSession({
-          htmlDocument: this.baseDoc,
-          url,
-          adapter,
-          sessionId,
-        });
+            ? await this.createPlaywrightWindow(sessionId, url)
+            : new SyncUIDomWindow({
+                url,
+                html: this.baseDoc,
+                sessionId,
+                adapter: {
+                  type: "jsdom",
+                  deps: { JSDOM },
+                },
+              });
         session.enableAssetProxy({
           baseUrl: url,
           secret: ASSET_PROXY_SECRET,
@@ -136,20 +191,32 @@ export class TestServer {
     return created;
   }
 
-  private async createPlaywrightAdapter(
+  private async createPlaywrightWindow(
     sessionId: string,
     url: string
-  ): Promise<UiAdapterFactory> {
+  ): Promise<SyncUIDomWindow> {
     if (!this.playwrightBrowser) {
       this.playwrightBrowser = await chromium.launch();
     }
     const page = await this.playwrightBrowser.newPage();
     this.playwrightPages.set(sessionId, page);
-    return (document: string, _options: { url: string }) =>
-      createPlaywrightAdapter({ page, htmlDocument: document, url });
+    return new SyncUIDomWindow({
+      url,
+      html: this.baseDoc,
+      sessionId,
+      adapter: {
+        type: "playwright",
+        deps: { page, url, htmlDocument: this.baseDoc },
+      },
+    });
   }
 
   async start() {
+    await Promise.all([
+      this.listenServer(this.navServerA, this.navPortA),
+      this.listenServer(this.navServerB, this.navPortB),
+    ]);
+
     return new Promise<void>((resolve) => {
       this.server.listen(this.port, () => {
         setTimeout(() => {
@@ -172,6 +239,10 @@ export class TestServer {
             session.terminate();
           }
           this.sessions.clear();
+          await Promise.all([
+            this.closeServer(this.navServerA),
+            this.closeServer(this.navServerB),
+          ]);
           await Promise.all(
             Array.from(this.playwrightPages.values()).map((page) =>
               page.close()
@@ -185,6 +256,24 @@ export class TestServer {
         })()
           .then(resolve)
           .catch(reject);
+      });
+    });
+  }
+
+  private listenServer(server: http.Server, port: number) {
+    return new Promise<void>((resolve) => {
+      server.listen(port, resolve);
+    });
+  }
+
+  private closeServer(server: http.Server) {
+    return new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
       });
     });
   }

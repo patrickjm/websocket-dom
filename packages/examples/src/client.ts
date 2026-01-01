@@ -17,9 +17,7 @@ document.addEventListener(
       return;
     }
     event.preventDefault();
-    client.transport?.send(
-      JSON.stringify({ type: "navigate", url: link.href })
-    );
+    client.navigate(link.href);
   },
   true
 );

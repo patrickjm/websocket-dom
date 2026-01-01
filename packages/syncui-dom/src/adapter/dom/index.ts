@@ -23,6 +23,10 @@ type GlobalScope = {
   DOMParser?: typeof DOMParser;
   localStorage?: Storage;
   sessionStorage?: Storage;
+  fetch?: typeof fetch;
+  Headers?: typeof Headers;
+  Request?: typeof Request;
+  Response?: typeof Response;
 };
 
 const getGlobalScope = (): GlobalScope => globalThis as unknown as GlobalScope;
@@ -56,6 +60,18 @@ export function createJsdomAdapter(
     runScripts: "outside-only",
     resources,
   });
+  const domGlobal = dom.window as unknown as {
+    fetch?: typeof fetch;
+    Headers?: typeof Headers;
+    Request?: typeof Request;
+    Response?: typeof Response;
+  };
+  if (globalThis.fetch) {
+    domGlobal.fetch = globalThis.fetch;
+    domGlobal.Headers = globalThis.Headers;
+    domGlobal.Request = globalThis.Request;
+    domGlobal.Response = globalThis.Response;
+  }
   const adapterWindow = dom.window as unknown as AdapterWindow;
   const nodes = new NodeStash(adapterWindow);
   extendPrototypes(adapterWindow, nodes, emitter);
@@ -77,6 +93,10 @@ export function createJsdomAdapter(
     scope.DOMParser = dom.window.DOMParser;
     scope.localStorage = localStorage;
     scope.sessionStorage = sessionStorage;
+    scope.fetch = globalThis.fetch;
+    scope.Headers = globalThis.Headers;
+    scope.Request = globalThis.Request;
+    scope.Response = globalThis.Response;
   };
 
   const withGlobals = <T>(fn: () => T): T => {
@@ -94,6 +114,10 @@ export function createJsdomAdapter(
       DOMParser: scope.DOMParser,
       localStorage: scope.localStorage,
       sessionStorage: scope.sessionStorage,
+      fetch: scope.fetch,
+      Headers: scope.Headers,
+      Request: scope.Request,
+      Response: scope.Response,
     };
     setGlobals();
     try {
@@ -118,6 +142,10 @@ export function createJsdomAdapter(
       DOMParser: scope.DOMParser,
       localStorage: scope.localStorage,
       sessionStorage: scope.sessionStorage,
+      fetch: scope.fetch,
+      Headers: scope.Headers,
+      Request: scope.Request,
+      Response: scope.Response,
     };
     setGlobals();
     try {

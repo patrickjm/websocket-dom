@@ -140,6 +140,10 @@ export class SyncUIClient {
     }
   }
 
+  navigate(url: string): boolean {
+    return this.sendPayload({ type: "navigate", url });
+  }
+
   private sendPayload(payload: unknown) {
     if (!this.transport?.isOpen()) {
       return false;
@@ -415,6 +419,15 @@ export class SyncUIClient {
         true
       );
     }
+    document.addEventListener(
+      "pointermove",
+      (event) => {
+        if (event instanceof PointerEvent && event.pointerType === "mouse") {
+          this.sendEvent(event, "mousemove");
+        }
+      },
+      true
+    );
 
     const debouncedSendMouseEvent = debounce((event: Event) => {
       this.sendEvent(event);
